@@ -119,11 +119,15 @@ function buildParams(blocks: LayoutBlock[]): string {
     const pw = block.width - 24;
     const px = block.x + 12;
     let py = block.y + 40;
+    const blockLabelNorm = block.label.trim().toLowerCase();
     for (const param of block.params) {
       parts.push(
         `<rect x="${px}" y="${py}" width="${pw}" height="20" fill="#f0ede6" stroke="#d5d0c6" stroke-width="0.5"/>`,
       );
-      const text = `${sanitizeForSvg(param.key)}: ${sanitizeForSvg(param.value)}`;
+      const keyNorm = param.key.trim().toLowerCase();
+      const text = keyNorm === blockLabelNorm
+        ? sanitizeForSvg(param.value)
+        : `${sanitizeForSvg(param.key)}: ${sanitizeForSvg(param.value)}`;
       parts.push(
         `<text x="${px + pw / 2}" y="${py + 14}" text-anchor="middle" ` +
         `font-family="${monoFont}" font-size="10" fill="#555">${text}</text>`,
@@ -183,16 +187,49 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
 function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string {
   const parts: string[] = [];
   const fontFamily = sanitizeForSvg(theme.annotation.fontFamily);
+  const fontSize = theme.annotation.fontSize;
+  // Approximate character width for truncation (in pixels, for the annotation font size)
+  const charWidth = fontSize * 0.55;
 
   for (const conn of connections) {
     if (!conn.annotation) continue;
-    const midX = (conn.sourcePoint.x + conn.targetPoint.x) / 2;
-    const midY = (conn.sourcePoint.y + conn.targetPoint.y) / 2;
+    const sx = conn.sourcePoint.x;
+    const sy = conn.sourcePoint.y;
+    const tx = conn.targetPoint.x;
+    const ty = conn.targetPoint.y;
+
+    let x: number;
+    let y: number;
+
+    if (conn.isFeedback) {
+      // Feedback arcs dip below the diagram — place annotation near the arc's low point.
+      x = (sx + tx) / 2;
+      y = Math.max(sy, ty) + 30;
+    } else {
+      // Forward connections: position annotation ABOVE the midpoint
+      // so it doesn't overlap sockets / port labels on short connections.
+      x = (sx + tx) / 2;
+      y = (sy + ty) / 2 - 14;
+    }
+
     const prefix = conn.isFeedback ? '↻ ' : '';
-    const text = prefix + sanitizeForSvg(conn.annotation);
+    let raw = conn.annotation;
+
+    // Truncate text that would be longer than the horizontal distance between
+    // source and target (avoids overflowing into adjacent sockets/labels).
+    if (!conn.isFeedback) {
+      const available = Math.abs(tx - sx);
+      const prefixWidth = prefix.length * charWidth;
+      const maxChars = Math.max(0, Math.floor((available - prefixWidth) / charWidth));
+      if (maxChars > 0 && raw.length > maxChars) {
+        raw = maxChars > 1 ? raw.slice(0, maxChars - 1) + '…' : raw.slice(0, maxChars);
+      }
+    }
+
+    const text = prefix + sanitizeForSvg(raw);
     parts.push(
-      `<text x="${midX}" y="${midY}" text-anchor="middle" ` +
-      `font-family="${fontFamily}" font-size="${theme.annotation.fontSize}" ` +
+      `<text x="${x}" y="${y}" text-anchor="middle" ` +
+      `font-family="${fontFamily}" font-size="${fontSize}" ` +
       `fill="${theme.annotation.color}" ` +
       `paint-order="stroke fill" stroke="#f7f5f0" stroke-width="3" stroke-linejoin="round">${text}</text>`,
     );
@@ -271,9 +308,13 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
   const style =
     `<style>@media print { .pf-panel, .pf-jack { filter: none; } }</style>`;
 
+  // Extend the viewBox horizontally so port labels ("Fall CV", etc.) on the
+  // leftmost and rightmost blocks don't get clipped outside the SVG.
+  const labelPadX = 60;
+  const vbWidth = width + labelPadX * 2;
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" ` +
-    `data-pf-min-width="${minWidth}" role="img" aria-labelledby="${idPrefix}-title ${idPrefix}-desc">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-labelPadX} 0 ${vbWidth} ${height}" width="100%" ` +
+    `data-pf-min-width="${minWidth + labelPadX * 2}" role="img" aria-labelledby="${idPrefix}-title ${idPrefix}-desc">` +
     `<title id="${idPrefix}-title">Patch diagram</title>` +
     `<desc id="${idPrefix}-desc">${desc}</desc>` +
     style +

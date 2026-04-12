@@ -288,7 +288,12 @@ export function layout(graph: PatchGraph, options: LayoutOptions = {}): LayoutRe
 
   // Overall dimensions
   const margin = 20;
-  const feedbackSpace = hasFeedback ? feedbackArcOffset + 30 : 0;
+  // Feedback arcs drop to diagramBottom + feedbackArcOffset and carry an
+  // annotation below them, so reserve enough room for the arc + the
+  // annotation line + its text stroke padding.
+  const feedbackSpace = hasFeedback
+    ? (diagramBottom - maxY) + feedbackArcOffset + 30 + 16
+    : 0;
   const width = maxX + margin;
   const height = maxY + margin + feedbackSpace;
 
