@@ -58,6 +58,51 @@ describe('parser', () => {
     });
   });
 
+  describe('module variants', () => {
+    it('parses module with variant in brackets', () => {
+      const result = parse('FILTER [Low Pass]:\n* Cutoff: 1kHz');
+      const filter = result.graph!.declaredBlocks.find(b => b.label === 'FILTER');
+      expect(filter).toBeDefined();
+      expect(filter!.subLabel).toBe('Low Pass');
+    });
+
+    it('handles module without variant', () => {
+      const result = parse('OSC:\n* Freq: 440');
+      const osc = result.graph!.declaredBlocks.find(b => b.label === 'OSC');
+      expect(osc!.subLabel).toBeNull();
+    });
+
+    it('variant declaration does not break connections', () => {
+      const result = parse('FILTER [High Pass]:\n- FILTER (In) <- OSC (Out)');
+      // The <- arrow isn't a valid operator; check that FILTER parsed with variant.
+      const filter = result.graph!.declaredBlocks.find(b => b.label === 'FILTER');
+      expect(filter).toBeDefined();
+      expect(filter!.subLabel).toBe('High Pass');
+    });
+
+    it('applies variant when added on re-declaration after original declaration without variant', () => {
+      const result = parse([
+        'FILTER:',
+        'FILTER [Band Pass]:',
+      ].join('\n'));
+      const filter = result.graph!.declaredBlocks.find(b => b.label === 'FILTER');
+      expect(filter).toBeDefined();
+      expect(filter!.subLabel).toBe('Band Pass');
+    });
+
+    it('connection references module name without variant and still resolves', () => {
+      const result = parse([
+        'FILTER [Low Pass]:',
+        '- OSC (Out) -> FILTER (In)',
+      ].join('\n'));
+      expect(result.errors).toHaveLength(0);
+      const conn = result.graph!.connections[0];
+      const filter = result.graph!.declaredBlocks.find(b => b.label === 'FILTER')!;
+      expect(conn.target.blockId).toBe(filter.id);
+      expect(filter.subLabel).toBe('Low Pass');
+    });
+  });
+
   describe('dot notation', () => {
     it('creates separate blocks for sections', () => {
       const result = parse([

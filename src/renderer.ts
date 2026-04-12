@@ -98,11 +98,17 @@ function buildPanels(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): str
     group += `<text x="${block.x + block.width / 2}" y="${block.y + 22}" text-anchor="middle" ` +
       `font-family="${fontFamily}" font-size="14" font-weight="700" ` +
       `fill="${theme.label.color}" letter-spacing="3">${label}</text>`;
-    // Sub-label
+    // Sub-label: dark bar directly below the inset label plate (Monotrail style)
     if (block.subLabel) {
       const subLabel = sanitizeForSvg(block.subLabel);
-      group += `<text x="${block.x + block.width / 2}" y="${block.y + 34}" text-anchor="middle" ` +
-        `font-family="${fontFamily}" font-size="9" fill="${theme.label.subColor}">${subLabel}</text>`;
+      const barX = insetX;
+      const barY = insetY + 28;
+      const barW = insetW;
+      const barH = 16;
+      group += `<rect class="pf-sublabel-bar" x="${barX}" y="${barY}" width="${barW}" height="${barH}" ` +
+        `fill="${theme.panel.shadow}"/>`;
+      group += `<text x="${block.x + block.width / 2}" y="${barY + barH / 2 + 3}" text-anchor="middle" ` +
+        `font-family="${fontFamily}" font-size="10" fill="${theme.panel.fill}" letter-spacing="1">${subLabel}</text>`;
     }
     group += `</g>`;
     parts.push(group);
@@ -118,7 +124,7 @@ function buildParams(blocks: LayoutBlock[], theme: Theme): string {
   for (const block of blocks) {
     const pw = block.width - 24;
     const px = block.x + 12;
-    let py = block.y + 40;
+    let py = block.y + 40 + (block.subLabel ? 18 : 0);
     const blockLabelNorm = block.label.trim().toLowerCase();
     for (const param of block.params) {
       parts.push(
@@ -161,9 +167,26 @@ function buildJacks(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): stri
   return parts.join('');
 }
 
+const SIGNAL_PILL_LABEL: Record<SignalType, string> = {
+  audio: 'audio',
+  cv: 'cv',
+  pitch: '1v/oct',
+  gate: 'gate',
+  trigger: 'trig',
+  clock: 'clk',
+};
+
 function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
   const parts: string[] = [];
   const fontFamily = sanitizeForSvg(theme.port.fontFamily);
+  const pillShow = theme.port.pill.show;
+  const pillFontSize = theme.port.pill.fontSize;
+  const pillTextColor = theme.port.pill.textColor;
+  const pillRadius = theme.port.pill.cornerRadius;
+  const pillPadX = 3;
+  const pillHeight = 11;
+  const pillGap = 6;
+  const charWidth = 6.5;
 
   for (const block of blocks) {
     for (const port of block.ports) {
@@ -173,11 +196,39 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
       const labelY = y + 3;
       const anchor = isOut ? 'start' : 'end';
       const display = sanitizeForSvg(port.display);
+      const labelWidth = port.display.length * charWidth;
+
       parts.push(
         `<text x="${labelX}" y="${labelY}" font-family="${fontFamily}" ` +
         `font-size="${theme.port.fontSize}" fill="${theme.port.labelColor}" font-weight="600" ` +
         `text-anchor="${anchor}">${display}</text>`,
       );
+
+      if (pillShow && port.signalType) {
+        const pillText = SIGNAL_PILL_LABEL[port.signalType];
+        const pillWidth = pillText.length * charWidth + pillPadX * 2;
+        const pillColor = theme.cable.colors[port.signalType].stroke;
+        // Position pill next to the label (away from the socket)
+        let pillX: number;
+        if (isOut) {
+          // socket → label → pill
+          pillX = labelX + labelWidth + pillGap;
+        } else {
+          // pill → label → socket; pill sits to the left of label's leftmost edge
+          pillX = labelX - labelWidth - pillGap - pillWidth;
+        }
+        const pillY = y - pillHeight / 2;
+        const textX = pillX + pillWidth / 2;
+        const textY = pillY + pillHeight / 2 + pillFontSize / 2 - 1;
+        parts.push(
+          `<rect class="pf-port-pill" x="${pillX}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" ` +
+          `rx="${pillRadius}" fill="${pillColor}" data-signal="${port.signalType}"/>`,
+        );
+        parts.push(
+          `<text class="pf-port-pill-text" x="${textX}" y="${textY}" text-anchor="middle" ` +
+          `font-family="${fontFamily}" font-size="${pillFontSize}" fill="${pillTextColor}" font-weight="600">${sanitizeForSvg(pillText)}</text>`,
+        );
+      }
     }
   }
 
@@ -310,7 +361,7 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
 
   // Extend the viewBox horizontally so port labels ("Fall CV", etc.) on the
   // leftmost and rightmost blocks don't get clipped outside the SVG.
-  const labelPadX = 60;
+  const labelPadX = 130;
   const vbWidth = width + labelPadX * 2;
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-labelPadX} 0 ${vbWidth} ${height}" width="100%" ` +

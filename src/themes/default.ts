@@ -36,6 +36,12 @@ export const defaultTheme: Theme = {
     },
     hideSocket: false,
     labelColor: '#1a1a1a',
+    pill: {
+      show: true,
+      fontSize: 8,
+      textColor: '#ffffff',
+      cornerRadius: 0,
+    },
   },
   cable: {
     width: 3,

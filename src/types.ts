@@ -69,6 +69,7 @@ export interface Point {
 
 export interface LayoutPort extends Port {
   position: Point;
+  signalType: SignalType | null;
 }
 
 export interface LayoutBlock {
@@ -149,6 +150,12 @@ export interface Theme {
     colors: SocketColors;
     hideSocket: boolean;
     labelColor: string;
+    pill: {
+      show: boolean;
+      fontSize: number;
+      textColor: string;
+      cornerRadius: number;
+    };
   };
   cable: {
     width: number;

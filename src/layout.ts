@@ -10,6 +10,7 @@ import type {
   PatchGraph,
   Point,
   Port,
+  SignalType,
 } from './types';
 import { feedbackArcPath, selfLoopArcPath, smoothstepPath } from './edge-routing';
 
@@ -32,11 +33,12 @@ function getBlockDimensions(block: Block, portCount: number): { width: number; h
   );
 
   const labelArea = 50;
+  const subLabelArea = block.subLabel ? 18 : 0;
   const paramsArea = 20 * block.params.length;
   const portsArea = Math.max((portCount / 2) * 24, 30);
   const padding = 20;
 
-  const height = Math.max(labelArea + paramsArea + portsArea + padding, MIN_HEIGHT);
+  const height = Math.max(labelArea + subLabelArea + paramsArea + portsArea + padding, MIN_HEIGHT);
 
   return { width, height };
 }
@@ -105,13 +107,14 @@ function placePorts(block: LayoutBlock, ports: Port[]): LayoutPort[] {
   const outPorts = ports.filter(p => p.direction === 'out');
 
   const layoutPorts: LayoutPort[] = [];
-  const startY = block.y + 40;
+  const startY = block.y + 40 + (block.subLabel ? 18 : 0);
   const spacing = 24;
 
   inPorts.forEach((p, i) => {
     layoutPorts.push({
       ...p,
       position: { x: block.x, y: startY + i * spacing },
+      signalType: null,
     });
   });
 
@@ -119,10 +122,58 @@ function placePorts(block: LayoutBlock, ports: Port[]): LayoutPort[] {
     layoutPorts.push({
       ...p,
       position: { x: block.x + block.width, y: startY + i * spacing },
+      signalType: null,
     });
   });
 
   return layoutPorts;
+}
+
+// ── Signal type derivation ──
+
+/**
+ * For each port, pick a signal type. Prefer forward edges; fall back to feedback.
+ * For outputs: first connection where this port is the source.
+ * For inputs: first connection where this port is the target.
+ */
+function assignPortSignalTypes(
+  blocks: LayoutBlock[],
+  forward: Connection[],
+  feedback: Connection[],
+): void {
+  const pick = (
+    blockId: string,
+    portId: string,
+    direction: 'in' | 'out',
+    connections: Connection[],
+  ): SignalType | null => {
+    for (const conn of connections) {
+      if (direction === 'out') {
+        if (conn.source.blockId === blockId && conn.source.portId === portId) {
+          return conn.signalType;
+        }
+      } else {
+        if (conn.target.blockId === blockId && conn.target.portId === portId) {
+          return conn.signalType;
+        }
+      }
+    }
+    return null;
+  };
+
+  for (const block of blocks) {
+    for (const port of block.ports) {
+      const fromForward = pick(block.id, port.id, port.direction, forward);
+      if (fromForward) {
+        port.signalType = fromForward;
+        continue;
+      }
+      const fromFeedback = pick(block.id, port.id, port.direction, feedback);
+      if (fromFeedback) {
+        port.signalType = fromFeedback;
+      }
+    }
+  }
 }
 
 // ── Lookup helpers ──
@@ -145,7 +196,7 @@ function findPortPosition(
 
 export function layout(graph: PatchGraph, options: LayoutOptions = {}): LayoutResult {
   const direction = options.direction ?? 'LR';
-  const rankSep = options.rankSep ?? 80;
+  const rankSep = options.rankSep ?? 160;
   const nodeSep = options.nodeSep ?? 40;
 
   const allBlocks: Block[] = [...graph.declaredBlocks, ...graph.stubBlocks];
@@ -214,6 +265,9 @@ export function layout(graph: PatchGraph, options: LayoutOptions = {}): LayoutRe
     layoutBlocks.push(partial);
     blocksById.set(block.id, partial);
   }
+
+  // Assign signal types to each port based on connections
+  assignPortSignalTypes(layoutBlocks, graph.connections, graph.feedbackEdges);
 
   // Compute diagram bounds
   let maxX = 0;

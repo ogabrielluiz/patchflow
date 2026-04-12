@@ -34,6 +34,18 @@ const samples = [
 - LFO (Out) >> VCA (CV)`,
   },
   {
+    name: 'filters-with-variants',
+    notation: `- Oscillator (Out) -> HPF (In)
+HPF [High Pass]:
+* Cutoff: 200 Hz
+
+- HPF (Out) -> LPF (In)
+LPF [Low Pass]:
+* Cutoff: 2 kHz
+
+- LPF (Out) -> Output (In)`,
+  },
+  {
     name: 'multi-voice',
     notation: `VOICE 1:
 - Osc1 (Out) -> Mixer (In1)

@@ -191,6 +191,31 @@ describe('renderer', () => {
     expect(svg).not.toContain(longText);
   });
 
+  it('renders port signal-type pills in SVG', () => {
+    const parseResult = parse('- A (Out) p> B (1v/oct)');
+    const positioned = layout(parseResult.graph!);
+    const svg = renderSvg(positioned, defaultTheme);
+    expect(svg).toContain('1v/oct');
+    expect(svg).toContain('#8cb87c');
+    expect(svg).toContain('pf-port-pill');
+  });
+
+  it('hides pills when theme.port.pill.show is false', () => {
+    const parseResult = parse('- A (Out) p> B (1v/oct)');
+    const positioned = layout(parseResult.graph!);
+    const theme = createTheme({ port: { pill: { show: false } } });
+    const svg = renderSvg(positioned, theme);
+    expect(svg).not.toContain('pf-port-pill');
+  });
+
+  it('renders dark variant sub-bar when subLabel present', () => {
+    const graph = parse('FILTER [Low Pass]:\n- FILTER (Out) -> VCA (In)').graph!;
+    const positioned = layout(graph);
+    const svg = renderSvg(positioned, defaultTheme);
+    expect(svg).toContain('Low Pass');
+    expect(svg).toContain('pf-sublabel-bar');
+  });
+
   it('truncates to raw slice when maxChars equals 1 (single-char fit)', () => {
     // Force a very narrow truncation window: block labels close together.
     // We construct a layout manually so sx and tx are almost equal.

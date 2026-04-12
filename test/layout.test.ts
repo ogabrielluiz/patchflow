@@ -262,6 +262,28 @@ describe('layout', () => {
     expect(conn.targetPoint.x).toBe(blockB.x + blockB.width);
   });
 
+  it('derives signal type per port from connections', () => {
+    const graph = parseGraph('- A (Out) p> B (1v/oct)');
+    const result = layout(graph);
+    const a = result.blocks.find(b => b.label === 'A')!;
+    const outPort = a.ports.find(p => p.id === 'out')!;
+    expect(outPort.signalType).toBe('pitch');
+    const b = result.blocks.find(b => b.label === 'B')!;
+    const inPort = b.ports.find(p => p.id === '1v/oct')!;
+    expect(inPort.signalType).toBe('pitch');
+  });
+
+  it('derives signal type from feedback edges when port is only used in feedback', () => {
+    const graph = parseGraph([
+      '- A (Out) -> B (In)',
+      '- B (FbOut) p> A (FbIn)',
+    ].join('\n'));
+    const result = layout(graph);
+    const b = result.blocks.find(bl => bl.label === 'B')!;
+    const fbOut = b.ports.find(p => p.id === 'fbout')!;
+    expect(fbOut.signalType).toBe('pitch');
+  });
+
   it('handles the MATHS bouncing ball patch', () => {
     const graph = parseGraph([
       'MATHS:',

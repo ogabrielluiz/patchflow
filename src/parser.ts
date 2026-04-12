@@ -245,7 +245,16 @@ export function parse(input: string): ParseResult {
     // Module/Voice declarations (lines ending with :)
     if (line.trim().endsWith(':') && !line.trim().startsWith('-') && !line.trim().startsWith('*') && !line.trim().startsWith('|')) {
       lastParam = null;
-      const moduleName = line.trim().slice(0, -1).trim();
+      const rawDecl = line.trim().slice(0, -1).trim();
+
+      // Parse optional variant in brackets: "MODULE [Variant]"
+      let moduleName = rawDecl;
+      let variant: string | null = null;
+      const variantMatch = rawDecl.match(/^(.+?)\s*\[(.+?)\]\s*$/);
+      if (variantMatch) {
+        moduleName = variantMatch[1].trim();
+        variant = variantMatch[2].trim();
+      }
 
       // Voice declaration: "VOICE <something>" — tag subsequent items, don't create a block
       if (/^voice\s+/i.test(moduleName)) {
@@ -265,7 +274,7 @@ export function parse(input: string): ParseResult {
         const block: Block = {
           id: normalize(moduleName),
           label: moduleName,
-          subLabel: null,
+          subLabel: variant,
           params: [],
           ports: [],
           parentModule: null,
@@ -273,6 +282,10 @@ export function parse(input: string): ParseResult {
         };
         declaredModules.set(lowerName, block);
         allBlocks.set(block.id, block);
+      } else if (variant) {
+        // Update subLabel if variant provided on re-declaration
+        const existing = declaredModules.get(lowerName)!;
+        if (!existing.subLabel) existing.subLabel = variant;
       }
       continue;
     }
