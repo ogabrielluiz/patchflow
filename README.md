@@ -77,13 +77,13 @@ VOICE 2:
 ## Install
 
 ```bash
-npm install patchflow
+npm install @ogabrielluiz/patchflow
 ```
 
 ## Usage
 
 ```ts
-import { render } from 'patchflow';
+import { render } from '@ogabrielluiz/patchflow';
 
 const svg = render(`
 MATHS:
