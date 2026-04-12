@@ -134,15 +134,11 @@ function findPortPosition(
 ): Point {
   const exact = block.ports.find(p => p.id === portId && p.direction === direction);
   if (exact) return exact.position;
-  // fallback: any port with same id
-  const any = block.ports.find(p => p.id === portId);
-  if (any) return any.position;
-  // fallback: center of correct face
-  const y = block.y + block.height / 2;
-  return {
-    x: direction === 'out' ? block.x + block.width : block.x,
-    y,
-  };
+  // fallback: any port with same id (different direction) — collectPorts
+  // synthesizes every connection endpoint, so the only way to miss an exact
+  // match is a direction mismatch on a port that exists in the block.
+  const any = block.ports.find(p => p.id === portId)!;
+  return any.position;
 }
 
 // ── Main ──

@@ -208,4 +208,29 @@ describe('parser', () => {
       expect(result.graph!.connections).toHaveLength(1);
     });
   });
+
+  describe('missing port errors', () => {
+    it('reports error when source endpoint has no parens', () => {
+      const result = parse('- NoParens >> B (In)');
+      expect(result.errors.length).toBeGreaterThan(0);
+      const msg = result.errors.map(e => e.message).join(' ');
+      expect(msg.toLowerCase()).toContain('source');
+      expect(result.graph!.connections).toHaveLength(0);
+    });
+
+    it('reports error when target endpoint has no parens', () => {
+      const result = parse('- A (Out) >> NoParens');
+      expect(result.errors.length).toBeGreaterThan(0);
+      const msg = result.errors.map(e => e.message).join(' ');
+      expect(msg.toLowerCase()).toContain('target');
+      expect(result.graph!.connections).toHaveLength(0);
+    });
+
+    it('reports error when target has unclosed paren (close before open)', () => {
+      // ")abc(" — closeParen < openParen triggers the null return path
+      const result = parse('- A (Out) >> B )oops(');
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.graph!.connections).toHaveLength(0);
+    });
+  });
 });

@@ -16,11 +16,8 @@ function normalize(str: string): string {
   return str.trim().toLowerCase().replace(/\s+/g, '-');
 }
 
-function makeBlockId(module: string, section?: string): string {
-  if (section) {
-    return `${normalize(module)}--${normalize(section)}`;
-  }
-  return normalize(module);
+function makeBlockId(module: string, section: string): string {
+  return `${normalize(module)}--${normalize(section)}`;
 }
 
 function parseGraphvizExtras(str: string): Record<string, string> {

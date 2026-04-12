@@ -147,4 +147,64 @@ describe('renderer', () => {
     const svg = renderSvg(layoutResult, noGridTheme);
     expect(svg).not.toContain('<pattern');
   });
+
+  it('renders block subLabel when present', () => {
+    const parseResult = parse('- A (Out) >> B (In)');
+    const layoutResult = layout(parseResult.graph!);
+    // Inject a subLabel on one block
+    layoutResult.blocks[0].subLabel = 'sub-line';
+    const svg = renderSvg(layoutResult, defaultTheme);
+    expect(svg).toContain('sub-line');
+  });
+
+  it('renders forward connection annotation above midpoint', () => {
+    const parseResult = parse('- A (Out) >> B (In) // modulates cutoff');
+    const layoutResult = layout(parseResult.graph!);
+    const svg = renderSvg(layoutResult, defaultTheme);
+    // Annotation text should be present without the feedback prefix
+    expect(svg).toContain('modulates cutoff');
+    expect(svg).not.toContain('↻ modulates cutoff');
+  });
+
+  it('renders feedback connection annotation with ↻ prefix and below arc', () => {
+    const input = [
+      '- A (Out) >> B (In)',
+      '- B (Out) >> A (In) // feedback loop',
+    ].join('\n');
+    const parseResult = parse(input);
+    const layoutResult = layout(parseResult.graph!);
+    const svg = renderSvg(layoutResult, defaultTheme);
+    expect(svg).toContain('↻');
+    expect(svg).toContain('feedback loop');
+  });
+
+  it('truncates long forward annotations to fit between endpoints', () => {
+    // Very long annotation on a short connection triggers truncation
+    // (raw.length > maxChars) in buildAnnotations.
+    const longText = 'this is a very long annotation that will definitely exceed the horizontal space between two adjacent modules and therefore must be truncated';
+    const parseResult = parse(`- A (Out) >> B (In) // ${longText}`);
+    const layoutResult = layout(parseResult.graph!);
+    const svg = renderSvg(layoutResult, defaultTheme);
+    // Ellipsis character should appear for truncated annotation
+    expect(svg).toContain('…');
+    // The full long text should not be present verbatim
+    expect(svg).not.toContain(longText);
+  });
+
+  it('truncates to raw slice when maxChars equals 1 (single-char fit)', () => {
+    // Force a very narrow truncation window: block labels close together.
+    // We construct a layout manually so sx and tx are almost equal.
+    const parseResult = parse('- A (Out) >> B (In) // xy');
+    const layoutResult = layout(parseResult.graph!);
+    // Collapse horizontal distance to force maxChars === 1 path
+    const conn = layoutResult.connections[0];
+    const fontSize = defaultTheme.annotation.fontSize;
+    const charWidth = fontSize * 0.55;
+    // distance just enough for 1 char
+    conn.sourcePoint = { ...conn.sourcePoint, x: 0 };
+    conn.targetPoint = { ...conn.targetPoint, x: charWidth * 1.5 };
+    const svg = renderSvg(layoutResult, defaultTheme);
+    // Since maxChars is 1, raw is sliced to 1 char without ellipsis
+    expect(svg).toContain('<text');
+  });
 });

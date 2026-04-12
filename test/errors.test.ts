@@ -44,4 +44,32 @@ describe('errors', () => {
     expect(sanitizeForSvg('"hello"')).toBe('&quot;hello&quot;');
     expect(sanitizeForSvg("it's")).toBe("it&#39;s");
   });
+
+  it('errorMessages.unclosedParen describes the issue', () => {
+    const msg = errorMessages.unclosedParen();
+    expect(msg).toContain('Unclosed');
+    expect(msg).toContain('paren');
+  });
+
+  it('errorMessages.missingPort mentions which side is missing', () => {
+    expect(errorMessages.missingPort('source')).toContain('source');
+    expect(errorMessages.missingPort('target')).toContain('target');
+  });
+
+  it('errorMessages.duplicateModule names the duplicated module', () => {
+    const msg = errorMessages.duplicateModule('MATHS');
+    expect(msg).toContain('MATHS');
+    expect(msg).toContain('more than once');
+  });
+
+  it('errorMessages.syntaxError wraps the detail', () => {
+    const msg = errorMessages.syntaxError('missing operator');
+    expect(msg).toContain('Syntax error');
+    expect(msg).toContain('missing operator');
+  });
+
+  it('errorMessages.emptyDiagram notes the empty state', () => {
+    const msg = errorMessages.emptyDiagram();
+    expect(msg.toLowerCase()).toContain('empty');
+  });
 });

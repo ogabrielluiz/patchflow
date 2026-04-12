@@ -208,7 +208,7 @@ export interface ParseDiagnostic {
 }
 
 export interface ParseResult {
-  graph: PatchGraph | null;
+  graph: PatchGraph;
   errors: ParseDiagnostic[];
   warnings: ParseDiagnostic[];
 }
