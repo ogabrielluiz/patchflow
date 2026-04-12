@@ -1,0 +1,48 @@
+name: Regenerate samples
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/generate-samples.ts'
+      - '.github/workflows/samples.yml'
+
+# Prevent concurrent runs, and skip commits made by this workflow itself
+concurrency:
+  group: samples-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    # Skip if the commit was made by this workflow (avoid infinite loop)
+    if: "!contains(github.event.head_commit.message, '[skip samples]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use a PAT or the default token with write perms (configured above)
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Regenerate samples
+        run: bun run samples
+
+      - name: Commit changes if samples differ
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet samples/; then
+            echo "No sample changes — skipping commit."
+          else
+            git add samples/
+            git commit -m "chore: regenerate samples [skip samples]"
+            git push
+          fi
