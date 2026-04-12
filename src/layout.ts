@@ -102,26 +102,42 @@ function collectPorts(
 
 // ── Port placement on block faces ──
 
+/**
+ * Compute the Y coordinate of the first port in a cluster so that the cluster
+ * is vertically centered in the available area below the inset label and above
+ * the block's bottom edge.
+ */
+function startYForFace(blockY: number, blockHeight: number, portCount: number): number {
+  const topMargin = 40;    // below inset label recess
+  const bottomMargin = 30; // above block bottom edge
+  const topY = blockY + topMargin;
+  const bottomY = blockY + blockHeight - bottomMargin;
+  const availableHeight = bottomY - topY;
+  const clusterHeight = Math.max(0, (portCount - 1) * 24);
+  return topY + (availableHeight - clusterHeight) / 2;
+}
+
 function placePorts(block: LayoutBlock, ports: Port[]): LayoutPort[] {
   const inPorts = ports.filter(p => p.direction === 'in');
   const outPorts = ports.filter(p => p.direction === 'out');
 
   const layoutPorts: LayoutPort[] = [];
-  const startY = block.y + 40 + (block.subLabel ? 18 : 0);
   const spacing = 24;
 
+  const inStartY = startYForFace(block.y, block.height, inPorts.length);
   inPorts.forEach((p, i) => {
     layoutPorts.push({
       ...p,
-      position: { x: block.x, y: startY + i * spacing },
+      position: { x: block.x, y: inStartY + i * spacing },
       signalType: null,
     });
   });
 
+  const outStartY = startYForFace(block.y, block.height, outPorts.length);
   outPorts.forEach((p, i) => {
     layoutPorts.push({
       ...p,
-      position: { x: block.x + block.width, y: startY + i * spacing },
+      position: { x: block.x + block.width, y: outStartY + i * spacing },
       signalType: null,
     });
   });
