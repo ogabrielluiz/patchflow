@@ -1,6 +1,6 @@
 {
   "name": "@ogabrielluiz/patchflow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Eurorack patch diagram renderer. Patchbook-compatible notation → skeuomorphic SVG.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -18,7 +18,9 @@
       "types": "./dist/types.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "bun test",
@@ -26,7 +28,13 @@
     "samples": "bun scripts/generate-samples.ts",
     "prepublishOnly": "bun run build"
   },
-  "keywords": ["eurorack", "patchbook", "modular-synth", "svg", "diagram"],
+  "keywords": [
+    "eurorack",
+    "patchbook",
+    "modular-synth",
+    "svg",
+    "diagram"
+  ],
   "author": "ogabrielluiz",
   "license": "MIT",
   "repository": {
