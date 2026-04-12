@@ -1,0 +1,302 @@
+import dagre from '@dagrejs/dagre';
+import type {
+  Block,
+  Connection,
+  LayoutBlock,
+  LayoutConnection,
+  LayoutOptions,
+  LayoutPort,
+  LayoutResult,
+  PatchGraph,
+  Point,
+  Port,
+} from './types';
+import { feedbackArcPath, selfLoopArcPath, smoothstepPath } from './edge-routing';
+
+// ── Dimension estimation (no DOM) ──
+
+const MIN_WIDTH = 140;
+const MIN_HEIGHT = 90;
+
+function getBlockDimensions(block: Block, portCount: number): { width: number; height: number } {
+  const labelWidth = block.label.length * 8;
+  const subLabelWidth = block.subLabel ? block.subLabel.length * 7 : 0;
+  const paramWidths = block.params.map(p => (`${p.key}: ${p.value}`).length * 7);
+  const longestParam = paramWidths.length > 0 ? Math.max(...paramWidths) : 0;
+
+  const width = Math.max(
+    labelWidth + 40,
+    subLabelWidth + 40,
+    longestParam + 30,
+    MIN_WIDTH,
+  );
+
+  const labelArea = 50;
+  const paramsArea = 20 * block.params.length;
+  const portsArea = Math.max((portCount / 2) * 24, 30);
+  const padding = 20;
+
+  const height = Math.max(labelArea + paramsArea + portsArea + padding, MIN_HEIGHT);
+
+  return { width, height };
+}
+
+// ── Port collection ──
+
+/**
+ * Collect ports on every block based on all connections (forward + feedback).
+ * If a port appears as both in and out, 'out' wins (source).
+ */
+function collectPorts(
+  blocks: Block[],
+  connections: Connection[],
+): Map<string, Port[]> {
+  // Start from whatever ports each block already has declared.
+  const byBlock = new Map<string, Map<string, Port>>();
+  for (const block of blocks) {
+    const map = new Map<string, Port>();
+    for (const p of block.ports) {
+      // dedupe key ignores direction here; 'out' wins later if conflict
+      const existing = map.get(p.id);
+      if (!existing || (existing.direction === 'in' && p.direction === 'out')) {
+        map.set(p.id, { ...p });
+      }
+    }
+    byBlock.set(block.id, map);
+  }
+
+  for (const conn of connections) {
+    const srcBlock = byBlock.get(conn.source.blockId);
+    if (srcBlock) {
+      const existing = srcBlock.get(conn.source.portId);
+      if (!existing || existing.direction === 'in') {
+        srcBlock.set(conn.source.portId, {
+          id: conn.source.portId,
+          display: conn.source.portDisplay,
+          direction: 'out',
+        });
+      }
+    }
+    const tgtBlock = byBlock.get(conn.target.blockId);
+    if (tgtBlock) {
+      const existing = tgtBlock.get(conn.target.portId);
+      if (!existing) {
+        tgtBlock.set(conn.target.portId, {
+          id: conn.target.portId,
+          display: conn.target.portDisplay,
+          direction: 'in',
+        });
+      }
+      // if existing is 'out', keep it ('out' wins)
+    }
+  }
+
+  const result = new Map<string, Port[]>();
+  for (const [blockId, map] of byBlock) {
+    result.set(blockId, Array.from(map.values()));
+  }
+  return result;
+}
+
+// ── Port placement on block faces ──
+
+function placePorts(block: LayoutBlock, ports: Port[]): LayoutPort[] {
+  const inPorts = ports.filter(p => p.direction === 'in');
+  const outPorts = ports.filter(p => p.direction === 'out');
+
+  const layoutPorts: LayoutPort[] = [];
+  const startY = block.y + 40;
+  const spacing = 24;
+
+  inPorts.forEach((p, i) => {
+    layoutPorts.push({
+      ...p,
+      position: { x: block.x, y: startY + i * spacing },
+    });
+  });
+
+  outPorts.forEach((p, i) => {
+    layoutPorts.push({
+      ...p,
+      position: { x: block.x + block.width, y: startY + i * spacing },
+    });
+  });
+
+  return layoutPorts;
+}
+
+// ── Lookup helpers ──
+
+function findPortPosition(
+  block: LayoutBlock,
+  portId: string,
+  direction: 'in' | 'out',
+): Point {
+  const exact = block.ports.find(p => p.id === portId && p.direction === direction);
+  if (exact) return exact.position;
+  // fallback: any port with same id
+  const any = block.ports.find(p => p.id === portId);
+  if (any) return any.position;
+  // fallback: center of correct face
+  const y = block.y + block.height / 2;
+  return {
+    x: direction === 'out' ? block.x + block.width : block.x,
+    y,
+  };
+}
+
+// ── Main ──
+
+export function layout(graph: PatchGraph, options: LayoutOptions = {}): LayoutResult {
+  const direction = options.direction ?? 'LR';
+  const rankSep = options.rankSep ?? 80;
+  const nodeSep = options.nodeSep ?? 40;
+
+  const allBlocks: Block[] = [...graph.declaredBlocks, ...graph.stubBlocks];
+
+  // Collect ports using both forward and feedback edges
+  const allConnections = [...graph.connections, ...graph.feedbackEdges];
+  const portsByBlock = collectPorts(allBlocks, allConnections);
+
+  // Compute dimensions for each block
+  const dimsByBlock = new Map<string, { width: number; height: number }>();
+  for (const block of allBlocks) {
+    const ports = portsByBlock.get(block.id) ?? [];
+    dimsByBlock.set(block.id, getBlockDimensions(block, ports.length));
+  }
+
+  // Build dagre graph
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({
+    rankdir: direction,
+    ranksep: rankSep,
+    nodesep: nodeSep,
+    marginx: 20,
+    marginy: 20,
+  });
+  g.setDefaultEdgeLabel(() => ({}));
+
+  for (const block of allBlocks) {
+    const d = dimsByBlock.get(block.id)!;
+    g.setNode(block.id, { width: d.width, height: d.height });
+  }
+
+  // Forward edges only (skip self-loops to avoid dagre issues)
+  for (const conn of graph.connections) {
+    if (conn.source.blockId === conn.target.blockId) continue;
+    g.setEdge(conn.source.blockId, conn.target.blockId);
+  }
+
+  dagre.layout(g);
+
+  // Extract positioned blocks
+  const layoutBlocks: LayoutBlock[] = [];
+  const blocksById = new Map<string, LayoutBlock>();
+
+  for (const block of allBlocks) {
+    const node = g.node(block.id);
+    const d = dimsByBlock.get(block.id)!;
+    const nodeX = node?.x ?? 0;
+    const nodeY = node?.y ?? 0;
+    const x = nodeX - d.width / 2;
+    const y = nodeY - d.height / 2;
+
+    const partial: LayoutBlock = {
+      id: block.id,
+      label: block.label,
+      subLabel: block.subLabel,
+      params: block.params,
+      ports: [],
+      parentModule: block.parentModule,
+      x,
+      y,
+      width: d.width,
+      height: d.height,
+    };
+    const ports = portsByBlock.get(block.id) ?? [];
+    partial.ports = placePorts(partial, ports);
+    layoutBlocks.push(partial);
+    blocksById.set(block.id, partial);
+  }
+
+  // Compute diagram bounds
+  let maxX = 0;
+  let maxY = 0;
+  for (const b of layoutBlocks) {
+    if (b.x + b.width > maxX) maxX = b.x + b.width;
+    if (b.y + b.height > maxY) maxY = b.y + b.height;
+  }
+
+  const hasFeedback = graph.feedbackEdges.length > 0;
+  const feedbackArcOffset = 20;
+  const diagramBottom = maxY + 10;
+
+  // Route connections
+  const layoutConnections: LayoutConnection[] = [];
+
+  for (const conn of graph.connections) {
+    const srcBlock = blocksById.get(conn.source.blockId);
+    const tgtBlock = blocksById.get(conn.target.blockId);
+    if (!srcBlock || !tgtBlock) continue;
+
+    const srcPos = findPortPosition(srcBlock, conn.source.portId, 'out');
+    const tgtPos = findPortPosition(tgtBlock, conn.target.portId, 'in');
+
+    let path: string;
+    if (conn.source.blockId === conn.target.blockId) {
+      const blockBottom = srcBlock.y + srcBlock.height;
+      path = selfLoopArcPath(srcPos, tgtPos, blockBottom, 20);
+    } else {
+      path = smoothstepPath(srcPos, tgtPos);
+    }
+
+    layoutConnections.push({
+      id: conn.id,
+      source: conn.source,
+      target: conn.target,
+      signalType: conn.signalType,
+      annotation: conn.annotation,
+      path,
+      isFeedback: false,
+      sourcePoint: srcPos,
+      targetPoint: tgtPos,
+    });
+  }
+
+  for (const conn of graph.feedbackEdges) {
+    const srcBlock = blocksById.get(conn.source.blockId);
+    const tgtBlock = blocksById.get(conn.target.blockId);
+    if (!srcBlock || !tgtBlock) continue;
+
+    const srcPos = findPortPosition(srcBlock, conn.source.portId, 'out');
+    const tgtPos = findPortPosition(tgtBlock, conn.target.portId, 'in');
+
+    const path = feedbackArcPath(srcPos, tgtPos, diagramBottom, feedbackArcOffset);
+
+    layoutConnections.push({
+      id: conn.id,
+      source: conn.source,
+      target: conn.target,
+      signalType: conn.signalType,
+      annotation: conn.annotation,
+      path,
+      isFeedback: true,
+      sourcePoint: srcPos,
+      targetPoint: tgtPos,
+    });
+  }
+
+  // Overall dimensions
+  const margin = 20;
+  const feedbackSpace = hasFeedback ? feedbackArcOffset + 30 : 0;
+  const width = maxX + margin;
+  const height = maxY + margin + feedbackSpace;
+
+  return {
+    blocks: layoutBlocks,
+    connections: layoutConnections,
+    width,
+    height,
+    signalTypeStats: graph.signalTypeStats,
+  };
+}
