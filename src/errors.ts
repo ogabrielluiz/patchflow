@@ -21,6 +21,9 @@ export const errorMessages = {
 
   emptyDiagram: () =>
     `Diagram is empty — no connections found.`,
+
+  ambiguousPortDirection: (port: string, module: string) =>
+    `Port "${port}" on module "${module}" is used as both input and output. Use distinct names like "In ${port}"/"Out ${port}" to disambiguate.`,
 };
 
 export function formatDiagnostic(diag: ParseDiagnostic, sourceLine: string): string {

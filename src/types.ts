@@ -201,7 +201,8 @@ export type ErrorCode =
   | 'UNCLOSED_PAREN'
   | 'DUPLICATE_MODULE'
   | 'UNKNOWN_MODULE'
-  | 'INVALID_PORT';
+  | 'INVALID_PORT'
+  | 'AMBIGUOUS_PORT_DIRECTION';
 
 export type ErrorSeverity = 'error' | 'warning';
 

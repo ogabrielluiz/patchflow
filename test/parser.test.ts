@@ -254,6 +254,35 @@ describe('parser', () => {
     });
   });
 
+  describe('ambiguous port direction detection', () => {
+    it('warns when the same port name is used as both source and target on a block', () => {
+      const result = parse([
+        '- A (Out) -> FX (L)',
+        '- FX (L) -> B (In)',
+      ].join('\n'));
+      const warning = result.warnings.find(w => w.code === 'AMBIGUOUS_PORT_DIRECTION');
+      expect(warning).toBeDefined();
+      expect(warning!.message).toContain('"L"');
+      expect(warning!.message).toContain('FX');
+    });
+
+    it('does not warn when port is only used in one direction', () => {
+      const result = parse([
+        '- A (Out) -> FX (In)',
+        '- FX (Out) -> B (In)',
+      ].join('\n'));
+      expect(result.warnings.find(w => w.code === 'AMBIGUOUS_PORT_DIRECTION')).toBeUndefined();
+    });
+
+    it('does not warn across different blocks', () => {
+      // Port "L" on Block1 used as source, port "L" on Block2 used as target — different blocks, no collision
+      const result = parse([
+        '- Block1 (L) -> Block2 (L)',
+      ].join('\n'));
+      expect(result.warnings.find(w => w.code === 'AMBIGUOUS_PORT_DIRECTION')).toBeUndefined();
+    });
+  });
+
   describe('missing port errors', () => {
     it('reports error when source endpoint has no parens', () => {
       const result = parse('- NoParens >> B (In)');

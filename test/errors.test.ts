@@ -72,4 +72,12 @@ describe('errors', () => {
     const msg = errorMessages.emptyDiagram();
     expect(msg.toLowerCase()).toContain('empty');
   });
+
+  it('errorMessages.ambiguousPortDirection names the port and module', () => {
+    const msg = errorMessages.ambiguousPortDirection('L', 'FX AID 1U');
+    expect(msg).toContain('"L"');
+    expect(msg).toContain('FX AID 1U');
+    expect(msg).toContain('input');
+    expect(msg).toContain('output');
+  });
 });

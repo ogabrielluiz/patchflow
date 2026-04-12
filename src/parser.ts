@@ -385,6 +385,51 @@ export function parse(input: string): ParseResult {
     }
   }
 
+  // ── Ambiguous port direction detection ──
+  // Build map: blockId -> portId -> { asSource: lines[], asTarget: lines[] }
+  type PortUsage = { asSource: number[]; asTarget: number[] };
+  const portUsageMap: Map<string, Map<string, PortUsage>> = new Map();
+
+  const allConns = [...forward, ...feedback];
+  for (const conn of allConns) {
+    // Record source usage
+    const srcBlock = conn.source.blockId;
+    if (!portUsageMap.has(srcBlock)) portUsageMap.set(srcBlock, new Map());
+    const srcPorts = portUsageMap.get(srcBlock)!;
+    if (!srcPorts.has(conn.source.portId)) srcPorts.set(conn.source.portId, { asSource: [], asTarget: [] });
+    srcPorts.get(conn.source.portId)!.asSource.push(0);
+
+    // Record target usage
+    const tgtBlock = conn.target.blockId;
+    if (!portUsageMap.has(tgtBlock)) portUsageMap.set(tgtBlock, new Map());
+    const tgtPorts = portUsageMap.get(tgtBlock)!;
+    if (!tgtPorts.has(conn.target.portId)) tgtPorts.set(conn.target.portId, { asSource: [], asTarget: [] });
+    tgtPorts.get(conn.target.portId)!.asTarget.push(0);
+  }
+
+  for (const [blockId, portMap] of portUsageMap) {
+    for (const [portId, usage] of portMap) {
+      if (usage.asSource.length > 0 && usage.asTarget.length > 0) {
+        // Find the block to get its label and the portDisplay
+        const block = allBlocks.get(blockId);
+        const blockLabel = block ? block.label : blockId;
+        // Find a connection that uses this port to get portDisplay
+        const srcConn = allConns.find(c => c.source.blockId === blockId && c.source.portId === portId);
+        const tgtConn = allConns.find(c => c.target.blockId === blockId && c.target.portId === portId);
+        const portDisplay = srcConn ? srcConn.source.portDisplay : (tgtConn ? tgtConn.target.portDisplay : portId);
+
+        warnings.push({
+          code: 'AMBIGUOUS_PORT_DIRECTION',
+          message: errorMessages.ambiguousPortDirection(portDisplay, blockLabel),
+          line: 0,
+          column: 1,
+          length: 1,
+          severity: 'warning',
+        });
+      }
+    }
+  }
+
   const graph: PatchGraph = {
     declaredBlocks: declaredBlocksList,
     stubBlocks,
