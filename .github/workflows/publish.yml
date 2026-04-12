@@ -24,15 +24,14 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
 
+      # Node 24 ships npm ≥ 11.5.1, which is required for Trusted Publisher OIDC.
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           scope: '@ogabrielluiz'
           always-auth: true
 
-      # Trusted Publisher (OIDC) requires npm ≥ 11.5.1 — Node 22 ships npm 10.x.
-      - run: npm install -g npm@latest
       - run: npm --version
 
       - uses: oven-sh/setup-bun@v2
