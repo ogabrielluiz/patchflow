@@ -23,6 +23,7 @@
     "build": "tsup",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "samples": "bun scripts/generate-samples.ts",
     "prepublishOnly": "bun run build"
   },
   "keywords": ["eurorack", "patchbook", "modular-synth", "svg", "diagram"],
@@ -36,7 +37,9 @@
     "@dagrejs/dagre": "^1.1.4"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/bun": "latest",
+    "sharp": "^0.34.5",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0"
   }
