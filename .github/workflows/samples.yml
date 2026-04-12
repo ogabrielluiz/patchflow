@@ -44,5 +44,15 @@ jobs:
           else
             git add samples/
             git commit -m "chore: regenerate samples [skip samples]"
-            git push
+            # Retry push with rebase in case main moved while we were building
+            for i in 1 2 3; do
+              if git push; then
+                echo "Pushed samples on attempt $i"
+                exit 0
+              fi
+              echo "Push rejected — pulling with rebase and retrying ($i/3)"
+              git pull --rebase origin main
+            done
+            echo "Failed to push after 3 retries"
+            exit 1
           fi
