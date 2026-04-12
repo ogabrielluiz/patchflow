@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { parse } from '../src/parser';
 import { layout } from '../src/layout';
-import { renderSvg } from '../src/renderer';
+import { renderSvg, fitLabel } from '../src/renderer';
 import { defaultTheme, createTheme } from '../src/themes/default';
 
 function renderFromNotation(input: string): string {
@@ -244,6 +244,76 @@ describe('renderer', () => {
     const svg = renderSvg(positioned, defaultTheme);
     expect(svg).toContain('Low Pass');
     expect(svg).toContain('pf-sublabel-bar');
+  });
+
+  describe('label truncation (fitLabel)', () => {
+    it('returns the label unchanged when it fits within maxWidth', () => {
+      expect(fitLabel('SHORT', 200, 11)).toBe('SHORT');
+    });
+
+    it('truncates with an ellipsis when the label overflows maxWidth', () => {
+      const result = fitLabel('DESMODUS VERSIO LONG MODULE NAME', 120, 11);
+      expect(result.endsWith('…')).toBe(true);
+      expect(result.length).toBeLessThan('DESMODUS VERSIO LONG MODULE NAME'.length);
+    });
+
+    it('returns a bare ellipsis when only one glyph fits', () => {
+      expect(fitLabel('LONG', 13, 11)).toBe('…');
+    });
+
+    it('returns the original string when maxWidth or charWidth is non-positive', () => {
+      expect(fitLabel('LONG', 0, 11)).toBe('LONG');
+      expect(fitLabel('LONG', 100, 0)).toBe('LONG');
+    });
+
+    it('returns the original string when maxWidth is smaller than one char', () => {
+      // Floor(5 / 11) = 0 → cannot fit any char; leave untouched so caller can
+      // decide whether to clip or overflow.
+      expect(fitLabel('LONG', 5, 11)).toBe('LONG');
+    });
+
+    it('truncates overflowing module labels in the rendered SVG', () => {
+      const graph = parse('- A (Out) >> B (In)').graph!;
+      const positioned = layout(graph);
+      // Force a label longer than the block can accommodate without regrowing
+      // (the renderer does not resize the block, so we inject post-layout).
+      const long = 'DESMODUS VERSIO LONG SUBTITLE THAT KEEPS GOING';
+      positioned.blocks[0].label = long;
+      const svg = renderSvg(positioned, defaultTheme);
+      // Extract only <text> node contents (visible labels). The raw label
+      // legitimately persists in the data-module attribute and <desc> summary.
+      const visible = Array.from(svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g))
+        .map(m => m[1])
+        .join('|');
+      expect(visible).not.toContain(long);
+      expect(visible).toContain('…');
+    });
+
+    it('truncates overflowing subLabels', () => {
+      const graph = parse('- A (Out) >> B (In)').graph!;
+      const positioned = layout(graph);
+      const longSub = 'a-very-long-subtitle-that-definitely-overflows-the-block';
+      positioned.blocks[0].subLabel = longSub;
+      const svg = renderSvg(positioned, defaultTheme);
+      const visible = Array.from(svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g))
+        .map(m => m[1])
+        .join('|');
+      expect(visible).not.toContain(longSub);
+      expect(visible).toContain('…');
+    });
+
+    it('truncates overflowing param values', () => {
+      const input = [
+        'OSC:',
+        '* Shape: an extremely long parameter value that should be truncated with ellipsis in the rendered SVG',
+        '',
+        '- OSC (Out) >> B (In)',
+      ].join('\n');
+      const graph = parse(input).graph!;
+      const positioned = layout(graph);
+      const svg = renderSvg(positioned, defaultTheme);
+      expect(svg).toContain('…');
+    });
   });
 
   describe('legend and notes positioning', () => {

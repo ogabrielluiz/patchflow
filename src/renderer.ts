@@ -13,6 +13,23 @@ function genId(): string {
   return 'pf-' + Math.random().toString(16).slice(2, 8);
 }
 
+// ── Text fitting ──
+
+/**
+ * Truncate `label` with an ellipsis so it fits within `maxWidth` px, assuming
+ * each glyph occupies roughly `charWidth` px (already accounting for any
+ * letter-spacing applied to the text element). Returns the label unchanged
+ * when it already fits or when maxWidth is too small for any content.
+ */
+export function fitLabel(label: string, maxWidth: number, charWidth: number): string {
+  if (maxWidth <= 0 || charWidth <= 0) return label;
+  const maxChars = Math.floor(maxWidth / charWidth);
+  if (maxChars <= 0) return label;
+  if (label.length <= maxChars) return label;
+  if (maxChars === 1) return '…';
+  return label.slice(0, maxChars - 1) + '…';
+}
+
 // ── Accessibility summary ──
 
 function buildDesc(layoutResult: LayoutResult): string {
@@ -74,12 +91,16 @@ function buildPanels(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): str
 
   for (const block of blocks) {
     const moduleName = sanitizeForSvg(block.parentModule || block.label);
-    const label = sanitizeForSvg(block.label);
     const fontFamily = sanitizeForSvg(theme.label.fontFamily);
 
     const insetX = block.x + 12;
     const insetY = block.y + 8;
     const insetW = block.width - 24;
+
+    // Truncate the main label (14px bold, 3px letter-spacing ≈ 11px/char) to
+    // fit inside the inset recess; long labels would otherwise bleed past the
+    // panel edge.
+    const label = sanitizeForSvg(fitLabel(block.label, insetW, 11));
 
     let group = `<g data-module="${moduleName}" filter="url(#${idPrefix}-panel-shadow)">`;
     // Main panel rect
@@ -100,7 +121,8 @@ function buildPanels(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): str
       `fill="${theme.label.color}" letter-spacing="3">${label}</text>`;
     // Sub-label: dark bar directly below the inset label plate (Monotrail style)
     if (block.subLabel) {
-      const subLabel = sanitizeForSvg(block.subLabel);
+      // SubLabel is 10px with 1px letter-spacing ≈ 7px/char.
+      const subLabel = sanitizeForSvg(fitLabel(block.subLabel, insetW - 8, 7));
       const barX = insetX;
       const barY = insetY + 28;
       const barW = insetW;
@@ -131,9 +153,11 @@ function buildParams(blocks: LayoutBlock[], theme: Theme): string {
         `<rect x="${px}" y="${py}" width="${pw}" height="20" fill="${theme.param.plateFill}" stroke="${theme.param.plateStroke}" stroke-width="0.5"/>`,
       );
       const keyNorm = param.key.trim().toLowerCase();
-      const text = keyNorm === blockLabelNorm
-        ? sanitizeForSvg(param.value)
-        : `${sanitizeForSvg(param.key)}: ${sanitizeForSvg(param.value)}`;
+      const rawText = keyNorm === blockLabelNorm
+        ? param.value
+        : `${param.key}: ${param.value}`;
+      // Monospace 10px ≈ 7px/char; leave ~4px padding on each side of the plate.
+      const text = sanitizeForSvg(fitLabel(rawText, pw - 8, 7));
       parts.push(
         `<text x="${px + pw / 2}" y="${py + 14}" text-anchor="middle" ` +
         `font-family="${monoFont}" font-size="10" fill="${theme.param.textColor}">${text}</text>`,

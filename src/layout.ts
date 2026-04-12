@@ -20,7 +20,9 @@ const MIN_WIDTH = 140;
 const MIN_HEIGHT = 90;
 
 function getBlockDimensions(block: Block, portCount: number): { width: number; height: number } {
-  const labelWidth = block.label.length * 8;
+  // Main label uses 14px bold with 3px letter-spacing, so per-char width is
+  // larger than plain 8px — use 11 to avoid overflow (matches renderer fit).
+  const labelWidth = block.label.length * 11;
   const subLabelWidth = block.subLabel ? block.subLabel.length * 7 : 0;
   const paramWidths = block.params.map(p => (`${p.key}: ${p.value}`).length * 7);
   const longestParam = paramWidths.length > 0 ? Math.max(...paramWidths) : 0;
