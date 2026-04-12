@@ -241,7 +241,7 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string
 
   const parts: string[] = [];
   const fontFamily = sanitizeForSvg(theme.annotation.fontFamily);
-  const noteFontSize = theme.annotation.fontSize + 1;
+  const noteFontSize = theme.annotation.fontSize + 2;
   const markerFontFamily = fontFamily;
 
   // Numbered markers on cables
@@ -285,15 +285,15 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string
   // Notes panel in upper-left
   const panelX = -120;
   let panelY = 20;
-  const lineGap = 14;
+  const lineGap = 16;
 
   annotated.forEach((conn, i) => {
     const num = i + 1;
     const noteText = `${num}. ${sanitizeForSvg(conn.annotation!)}`;
     parts.push(
       `<text x="${panelX}" y="${panelY}" ` +
-      `font-family="${fontFamily}" font-size="${noteFontSize}" ` +
-      `fill="${theme.annotation.color}">${noteText}</text>`,
+      `font-family="${fontFamily}" font-size="${noteFontSize}" font-weight="600" ` +
+      `fill="${theme.label.color}">${noteText}</text>`,
     );
     panelY += lineGap;
   });
