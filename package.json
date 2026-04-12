@@ -1,6 +1,6 @@
 {
   "name": "@ogabrielluiz/patchflow",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Eurorack patch diagram renderer. Patchbook-compatible notation → skeuomorphic SVG.",
   "type": "module",
   "main": "./dist/index.cjs",
