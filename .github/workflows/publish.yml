@@ -44,4 +44,16 @@ jobs:
         run: bun run build
 
       - name: Publish to npm
+        id: publish
         run: npm publish --provenance --access public
+
+      - name: Dump npm debug logs on failure
+        if: failure() && steps.publish.outcome == 'failure'
+        run: |
+          echo "=== npm debug logs ==="
+          for log in ~/.npm/_logs/*.log; do
+            echo "--- $log ---"
+            cat "$log"
+            echo ""
+          done
+          echo "=== end logs ==="
