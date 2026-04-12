@@ -89,6 +89,64 @@ describe('parser', () => {
     });
   });
 
+  describe('voice declarations do not create blocks', () => {
+    it('VOICE 1: adds to voices but does not create a declared block', () => {
+      const result = parse('VOICE 1:\n- Osc (Out) -> Filter (In)');
+      expect(result.graph!.voices).toContain('VOICE 1');
+      expect(result.graph!.declaredBlocks.find(b => b.label === 'VOICE 1')).toBeUndefined();
+    });
+  });
+
+  describe('parent module with sections', () => {
+    it('moves params to matching sections', () => {
+      const result = parse([
+        'MATHS:',
+        '* CH 1: Cycle ON',
+        '* CH 2: Attenuverter ~2 o\'clock',
+        '- MATHS.CH 1 (OUT) >> MATHS.CH 2 (In)',
+      ].join('\n'));
+      const allBlocks = [...result.graph!.declaredBlocks, ...result.graph!.stubBlocks];
+      const ch1 = allBlocks.find(b => b.label === 'CH 1');
+      const ch2 = allBlocks.find(b => b.label === 'CH 2');
+      expect(ch1).toBeDefined();
+      expect(ch2).toBeDefined();
+      expect(ch1!.params).toContainEqual({ key: 'CH 1', value: 'Cycle ON' });
+      expect(ch2!.params.some(p => p.value.includes('Attenuverter'))).toBe(true);
+    });
+
+    it('removes parent block when all params are moved and no direct connections', () => {
+      const result = parse([
+        'MATHS:',
+        '* CH 1: Cycle ON',
+        '- MATHS.CH 1 (OUT) >> Filter (In)',
+      ].join('\n'));
+      expect(result.graph!.declaredBlocks.find(b => b.label === 'MATHS')).toBeUndefined();
+    });
+
+    it('keeps parent block when it has direct connections', () => {
+      const result = parse([
+        'MATHS:',
+        '* CH 1: Cycle ON',
+        '- MATHS (Out) >> Filter (In)',
+        '- MATHS.CH 1 (OUT) >> VCA (In)',
+      ].join('\n'));
+      const allBlocks = [...result.graph!.declaredBlocks, ...result.graph!.stubBlocks];
+      expect(allBlocks.find(b => b.label === 'MATHS' && b.parentModule === null)).toBeDefined();
+    });
+
+    it('keeps params on parent if no matching section', () => {
+      const result = parse([
+        'MATHS:',
+        '* Global: mode 1',
+        '- MATHS.CH 1 (OUT) >> Filter (In)',
+      ].join('\n'));
+      const allBlocks = [...result.graph!.declaredBlocks, ...result.graph!.stubBlocks];
+      const maths = allBlocks.find(b => b.label === 'MATHS' && b.parentModule === null);
+      expect(maths).toBeDefined();
+      expect(maths!.params).toContainEqual({ key: 'Global', value: 'mode 1' });
+    });
+  });
+
   describe('normalization', () => {
     it('normalizes port names case-insensitively', () => {
       const result = parse('- A (Out) >> B (In)\n- B (OUT) >> C (In)');

@@ -250,12 +250,18 @@ export function parse(input: string): ParseResult {
       lastParam = null;
       const moduleName = line.trim().slice(0, -1).trim();
 
-      // It's a voice or module declaration
-      currentModuleName = moduleName;
-      currentVoice = moduleName; // treat all declarations as potential voices
-      if (!voices.includes(moduleName)) {
-        voices.push(moduleName);
+      // Voice declaration: "VOICE <something>" — tag subsequent items, don't create a block
+      if (/^voice\s+/i.test(moduleName)) {
+        currentVoice = moduleName;
+        currentModuleName = null;
+        if (!voices.includes(moduleName)) {
+          voices.push(moduleName);
+        }
+        continue;
       }
+
+      // Module declaration
+      currentModuleName = moduleName;
 
       const lowerName = moduleName.toLowerCase();
       if (!declaredModules.has(lowerName)) {
@@ -288,12 +294,55 @@ export function parse(input: string): ParseResult {
   // ── Post-processing ──
 
   // Separate declared vs stub blocks
-  const declaredBlocksList: Block[] = [...declaredModules.values()];
+  let declaredBlocksList: Block[] = [...declaredModules.values()];
   const stubBlocks: Block[] = [];
   for (const [id, block] of allBlocks) {
     if (![...declaredModules.values()].find(b => b.id === id)) {
       stubBlocks.push(block);
     }
+  }
+
+  // ── Parent-module-with-sections post-processing ──
+  // For each declared block, if it has child sections (blocks with parentModule === this.label),
+  // migrate matching params to sections. Remove parent if empty and not directly referenced.
+  const blocksToRemove: Set<string> = new Set();
+  for (const parent of declaredBlocksList) {
+    const parentLabelLower = parent.label.trim().toLowerCase();
+    const childSections: Block[] = [];
+    for (const block of [...declaredBlocksList, ...stubBlocks]) {
+      if (block.parentModule && block.parentModule.trim().toLowerCase() === parentLabelLower) {
+        childSections.push(block);
+      }
+    }
+    if (childSections.length === 0) continue;
+
+    // Migrate matching params
+    const remainingParams: Param[] = [];
+    for (const param of parent.params) {
+      const keyLower = param.key.trim().toLowerCase();
+      const matchingSection = childSections.find(
+        s => s.label.trim().toLowerCase() === keyLower
+      );
+      if (matchingSection) {
+        matchingSection.params.push(param);
+      } else {
+        remainingParams.push(param);
+      }
+    }
+    parent.params = remainingParams;
+
+    // If parent has no remaining params AND is not directly connected, remove it
+    if (remainingParams.length === 0) {
+      const directlyReferenced = connections.some(
+        c => c.source.blockId === parent.id || c.target.blockId === parent.id
+      );
+      if (!directlyReferenced) {
+        blocksToRemove.add(parent.id);
+      }
+    }
+  }
+  if (blocksToRemove.size > 0) {
+    declaredBlocksList = declaredBlocksList.filter(b => !blocksToRemove.has(b.id));
   }
 
   // ── Feedback detection ──
