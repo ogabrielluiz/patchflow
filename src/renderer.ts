@@ -235,7 +235,7 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
   return parts.join('');
 }
 
-function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string {
+function buildAnnotations(theme: Theme, connections: LayoutConnection[], layoutHeight: number): string {
   const annotated = connections.filter(c => c.annotation);
   if (annotated.length === 0) return '';
 
@@ -282,20 +282,24 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string
     );
   });
 
-  // Notes panel in upper-left
+  // Notes panel in bottom-left, stacked upward above the legend line
   const panelX = -120;
-  let panelY = 20;
   const lineGap = 16;
+  const noteCount = annotated.length;
+  // Bottom of notes sits at layoutHeight - 10 (just above the legend row)
+  const bottomY = layoutHeight - 10;
+  // First note (topmost) starts at bottomY - (noteCount - 1) * lineGap
+  const firstNoteY = bottomY - (noteCount - 1) * lineGap;
 
   annotated.forEach((conn, i) => {
     const num = i + 1;
     const noteText = `${num}. ${sanitizeForSvg(conn.annotation!)}`;
+    const noteY = firstNoteY + i * lineGap;
     parts.push(
-      `<text x="${panelX}" y="${panelY}" ` +
+      `<text x="${panelX}" y="${noteY}" ` +
       `font-family="${fontFamily}" font-size="${noteFontSize}" font-weight="600" ` +
       `fill="${theme.label.color}">${noteText}</text>`,
     );
-    panelY += lineGap;
   });
 
   return parts.join('');
@@ -309,17 +313,20 @@ function buildLegend(theme: Theme, layoutResult: LayoutResult): string {
   const parts: string[] = [];
   const fontFamily = sanitizeForSvg(theme.annotation.fontFamily);
   const itemWidth = 70;
+  const totalWidth = used.length * itemWidth;
+  // Right-align: place the legend's right edge at layoutResult.width
+  const legendStartX = layoutResult.width - totalWidth;
   const y = layoutResult.height - 20;
-  let x = 20;
 
-  for (const sig of used) {
+  for (let i = 0; i < used.length; i++) {
+    const sig = used[i];
     const color = theme.cable.colors[sig].stroke;
+    const x = legendStartX + i * itemWidth;
     let g = `<g transform="translate(${x}, ${y})">`;
     g += `<line x1="0" y1="0" x2="20" y2="0" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
     g += `<text x="26" y="3" font-family="${fontFamily}" font-size="9" fill="${theme.annotation.color}">${sig}</text>`;
     g += `</g>`;
     parts.push(g);
-    x += itemWidth;
   }
 
   return parts.join('');
@@ -364,7 +371,7 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
     `<g class="pf-layer-params">${buildParams(layoutResult.blocks, theme)}</g>`,
     `<g class="pf-layer-jacks">${buildJacks(theme, idPrefix, layoutResult.blocks)}</g>`,
     `<g class="pf-layer-labels">${buildLabels(theme, layoutResult.blocks)}</g>`,
-    `<g class="pf-layer-annotations">${buildAnnotations(theme, layoutResult.connections)}</g>`,
+    `<g class="pf-layer-annotations">${buildAnnotations(theme, layoutResult.connections, height)}</g>`,
     `<g class="pf-layer-legend">${buildLegend(theme, layoutResult)}</g>`,
   ].join('');
 
@@ -375,8 +382,19 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
   // leftmost and rightmost blocks don't get clipped outside the SVG.
   const labelPadX = 130;
   const vbWidth = width + labelPadX * 2;
+
+  // Bottom padding must accommodate:
+  //   • legend row: ~30px
+  //   • observation notes (bottom-left, stacked upward above legend):
+  //     topmost note sits at height - 10 - (noteCount-1)*16
+  //     so we need notesHeight + 10 px of padding below height for them to be visible
+  const noteCount = layoutResult.connections.filter(c => c.annotation).length;
+  const notesHeight = noteCount > 0 ? noteCount * 16 + 10 : 0;
+  const bottomPad = Math.max(30, notesHeight + 10);
+  const vbHeight = height + bottomPad;
+
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-labelPadX} 0 ${vbWidth} ${height}" width="100%" ` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-labelPadX} 0 ${vbWidth} ${vbHeight}" width="100%" ` +
     `data-pf-min-width="${minWidth + labelPadX * 2}" role="img" aria-labelledby="${idPrefix}-title ${idPrefix}-desc">` +
     `<title id="${idPrefix}-title">Patch diagram</title>` +
     `<desc id="${idPrefix}-desc">${desc}</desc>` +
