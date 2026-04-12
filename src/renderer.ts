@@ -248,7 +248,7 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[], connections: LayoutCon
       parts.push(
         `<text x="${x}" y="${textY}" font-family="${fontFamily}" ` +
         `font-size="${theme.port.fontSize}" fill="${theme.port.labelColor}" font-weight="600" ` +
-        `text-anchor="middle">${display}</text>`,
+        `text-anchor="middle" dominant-baseline="central">${display}</text>`,
       );
 
       if (pillShow && port.signalType) {
@@ -259,14 +259,12 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[], connections: LayoutCon
         const pillCenterY = below ? y + pillOffsetBelow : y - pillOffsetAbove;
         const pillX = x - pillWidth / 2;
         const pillY = pillCenterY - pillHeight / 2;
-        const pillTextX = x;
-        const pillTextY = pillY + pillHeight / 2 + pillFontSize / 2 - 1;
         parts.push(
           `<rect class="pf-port-pill" x="${pillX}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" ` +
           `rx="${pillRadius}" fill="${pillColor}" data-signal="${port.signalType}"/>`,
         );
         parts.push(
-          `<text class="pf-port-pill-text" x="${pillTextX}" y="${pillTextY}" text-anchor="middle" ` +
+          `<text class="pf-port-pill-text" x="${x}" y="${pillCenterY}" text-anchor="middle" dominant-baseline="central" ` +
           `font-family="${fontFamily}" font-size="${pillFontSize}" fill="${pillTextColor}" font-weight="600">${sanitizeForSvg(pillText)}</text>`,
         );
       }
