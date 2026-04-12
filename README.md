@@ -17,7 +17,10 @@ MATHS:
 - MATHS.CH 2 (Out) >> MATHS.CH 1 (Fall CV) // shortens fall each cycle
 ```
 
-![Bouncing ball diagram](./samples/bouncing-ball.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./samples/bouncing-ball-dark.svg">
+  <img alt="Bouncing ball diagram" src="./samples/bouncing-ball-light.svg">
+</picture>
 
 ### Quadrature LFOs (multi-module with feedback)
 
@@ -32,7 +35,10 @@ MATHS:
 - MATHS.CH 4 (OUT) >> VCA (CV)
 ```
 
-![Quadrature LFOs diagram](./samples/quadrature-lfos.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./samples/quadrature-lfos-dark.svg">
+  <img alt="Quadrature LFOs diagram" src="./samples/quadrature-lfos-light.svg">
+</picture>
 
 ### Simple chain
 
@@ -43,7 +49,10 @@ MATHS:
 - LFO (Out) >> VCA (CV)
 ```
 
-![Simple chain diagram](./samples/simple-chain.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./samples/simple-chain-dark.svg">
+  <img alt="Simple chain diagram" src="./samples/simple-chain-light.svg">
+</picture>
 
 ### Multi-voice patch
 
@@ -60,7 +69,10 @@ VOICE 2:
 - Filter (Out) -> Output (In)
 ```
 
-![Multi-voice diagram](./samples/multi-voice.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./samples/multi-voice-dark.svg">
+  <img alt="Multi-voice diagram" src="./samples/multi-voice-light.svg">
+</picture>
 
 ## Install
 

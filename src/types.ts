@@ -135,12 +135,20 @@ export interface Theme {
     fontFamily: string;
     color: string;
     subColor: string;
+    plateFill: string;
+    plateStroke: string;
+  };
+  param: {
+    plateFill: string;
+    plateStroke: string;
+    textColor: string;
   };
   port: {
     fontFamily: string;
     fontSize: number;
     colors: SocketColors;
     hideSocket: boolean;
+    labelColor: string;
   };
   cable: {
     width: number;
@@ -151,6 +159,7 @@ export interface Theme {
     fontFamily: string;
     fontSize: number;
     color: string;
+    haloColor: string;
   };
   grid: {
     dotColor: string;

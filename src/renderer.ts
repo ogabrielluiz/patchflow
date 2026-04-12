@@ -93,7 +93,7 @@ function buildPanels(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): str
       `stroke="${theme.panel.shadow}" stroke-width="0.5"/>`;
     // Inset label recess
     group += `<rect x="${insetX}" y="${insetY}" width="${insetW}" height="28" ` +
-      `fill="#f4f1ea" stroke="#c5c0b6" stroke-width="0.5"/>`;
+      `fill="${theme.label.plateFill}" stroke="${theme.label.plateStroke}" stroke-width="0.5"/>`;
     // Label
     group += `<text x="${block.x + block.width / 2}" y="${block.y + 22}" text-anchor="middle" ` +
       `font-family="${fontFamily}" font-size="14" font-weight="700" ` +
@@ -111,7 +111,7 @@ function buildPanels(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): str
   return parts.join('');
 }
 
-function buildParams(blocks: LayoutBlock[]): string {
+function buildParams(blocks: LayoutBlock[], theme: Theme): string {
   const parts: string[] = [];
   const monoFont = "'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace";
 
@@ -122,7 +122,7 @@ function buildParams(blocks: LayoutBlock[]): string {
     const blockLabelNorm = block.label.trim().toLowerCase();
     for (const param of block.params) {
       parts.push(
-        `<rect x="${px}" y="${py}" width="${pw}" height="20" fill="#f0ede6" stroke="#d5d0c6" stroke-width="0.5"/>`,
+        `<rect x="${px}" y="${py}" width="${pw}" height="20" fill="${theme.param.plateFill}" stroke="${theme.param.plateStroke}" stroke-width="0.5"/>`,
       );
       const keyNorm = param.key.trim().toLowerCase();
       const text = keyNorm === blockLabelNorm
@@ -130,7 +130,7 @@ function buildParams(blocks: LayoutBlock[]): string {
         : `${sanitizeForSvg(param.key)}: ${sanitizeForSvg(param.value)}`;
       parts.push(
         `<text x="${px + pw / 2}" y="${py + 14}" text-anchor="middle" ` +
-        `font-family="${monoFont}" font-size="10" fill="#555">${text}</text>`,
+        `font-family="${monoFont}" font-size="10" fill="${theme.param.textColor}">${text}</text>`,
       );
       py += 20;
     }
@@ -175,7 +175,7 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
       const display = sanitizeForSvg(port.display);
       parts.push(
         `<text x="${labelX}" y="${labelY}" font-family="${fontFamily}" ` +
-        `font-size="${theme.port.fontSize}" fill="#1a1a1a" font-weight="600" ` +
+        `font-size="${theme.port.fontSize}" fill="${theme.port.labelColor}" font-weight="600" ` +
         `text-anchor="${anchor}">${display}</text>`,
       );
     }
@@ -231,7 +231,7 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string
       `<text x="${x}" y="${y}" text-anchor="middle" ` +
       `font-family="${fontFamily}" font-size="${fontSize}" ` +
       `fill="${theme.annotation.color}" ` +
-      `paint-order="stroke fill" stroke="#f7f5f0" stroke-width="3" stroke-linejoin="round">${text}</text>`,
+      `paint-order="stroke fill" stroke="${theme.annotation.haloColor}" stroke-width="3" stroke-linejoin="round">${text}</text>`,
     );
   }
 
@@ -253,7 +253,7 @@ function buildLegend(theme: Theme, layoutResult: LayoutResult): string {
     const color = theme.cable.colors[sig].stroke;
     let g = `<g transform="translate(${x}, ${y})">`;
     g += `<line x1="0" y1="0" x2="20" y2="0" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
-    g += `<text x="26" y="3" font-family="${fontFamily}" font-size="9" fill="#666">${sig}</text>`;
+    g += `<text x="26" y="3" font-family="${fontFamily}" font-size="9" fill="${theme.annotation.color}">${sig}</text>`;
     g += `</g>`;
     parts.push(g);
     x += itemWidth;
@@ -298,7 +298,7 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
     `<g class="pf-layer-bg">${buildBackground(theme, idPrefix, width, height)}</g>`,
     `<g class="pf-layer-cables">${buildCables(theme, layoutResult.connections)}</g>`,
     `<g class="pf-layer-panels" >${buildPanels(theme, idPrefix, layoutResult.blocks)}</g>`,
-    `<g class="pf-layer-params">${buildParams(layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-params">${buildParams(layoutResult.blocks, theme)}</g>`,
     `<g class="pf-layer-jacks">${buildJacks(theme, idPrefix, layoutResult.blocks)}</g>`,
     `<g class="pf-layer-labels">${buildLabels(theme, layoutResult.blocks)}</g>`,
     `<g class="pf-layer-annotations">${buildAnnotations(theme, layoutResult.connections)}</g>`,

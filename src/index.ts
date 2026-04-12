@@ -2,6 +2,7 @@ export { parse } from './parser';
 export { layout } from './layout';
 export { renderSvg } from './renderer';
 export { createTheme, defaultTheme } from './themes/default';
+export { darkTheme } from './themes/dark';
 
 import type { RenderOptions } from './types';
 import { parse } from './parser';

@@ -1,4 +1,6 @@
-import { render } from '../src/index';
+import { renderSvg, parse, layout } from '../src/index';
+import { defaultTheme } from '../src/themes/default';
+import { darkTheme } from '../src/themes/dark';
 import { Resvg } from '@resvg/resvg-js';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -49,16 +51,30 @@ VOICE 2:
 const outDir = join(import.meta.dir, '..', 'samples');
 mkdirSync(outDir, { recursive: true });
 
+const variants = [
+  { suffix: '-light', theme: defaultTheme, pngBg: '#f7f5f0' },
+  { suffix: '-dark', theme: darkTheme, pngBg: '#0d1117' },  // GitHub dark mode bg
+];
+
 for (const sample of samples) {
-  const svg = render(sample.notation);
-  writeFileSync(join(outDir, `${sample.name}.svg`), svg);
+  const parseResult = parse(sample.notation);
+  if (!parseResult.graph) {
+    console.error(`Failed to parse ${sample.name}`);
+    continue;
+  }
+  const layoutResult = layout(parseResult.graph);
 
-  const resvg = new Resvg(svg, {
-    background: '#f7f5f0',
-    fitTo: { mode: 'width', value: 1200 },
-  });
-  const pngData = resvg.render();
-  writeFileSync(join(outDir, `${sample.name}.png`), pngData.asPng());
+  for (const variant of variants) {
+    const svg = renderSvg(layoutResult, variant.theme);
+    const base = `${sample.name}${variant.suffix}`;
+    writeFileSync(join(outDir, `${base}.svg`), svg);
 
-  console.log(`Generated ${sample.name}.svg and ${sample.name}.png`);
+    const resvg = new Resvg(svg, {
+      background: variant.pngBg,
+      fitTo: { mode: 'width', value: 1200 },
+    });
+    writeFileSync(join(outDir, `${base}.png`), resvg.render().asPng());
+
+    console.log(`Generated ${base}.svg and ${base}.png`);
+  }
 }

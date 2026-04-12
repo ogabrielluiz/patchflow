@@ -16,6 +16,13 @@ export const defaultTheme: Theme = {
     fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     color: '#1a1a1a',
     subColor: '#888888',
+    plateFill: '#f4f1ea',
+    plateStroke: '#c5c0b6',
+  },
+  param: {
+    plateFill: '#f0ede6',
+    plateStroke: '#d5d0c6',
+    textColor: '#555555',
   },
   port: {
     fontFamily: "'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace",
@@ -28,6 +35,7 @@ export const defaultTheme: Theme = {
       pin: '#333333',
     },
     hideSocket: false,
+    labelColor: '#1a1a1a',
   },
   cable: {
     width: 3,
@@ -45,6 +53,7 @@ export const defaultTheme: Theme = {
     fontFamily: "'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace",
     fontSize: 9,
     color: '#888888',
+    haloColor: '#f7f5f0',
   },
   grid: {
     dotColor: '#aaaaaa',
