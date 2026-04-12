@@ -1,0 +1,285 @@
+import type {
+  LayoutBlock,
+  LayoutConnection,
+  LayoutResult,
+  SignalType,
+  Theme,
+} from './types';
+import { sanitizeForSvg } from './errors';
+
+// ── ID generation ──
+
+function genId(): string {
+  return 'pf-' + Math.random().toString(16).slice(2, 8);
+}
+
+// ── Accessibility summary ──
+
+function buildDesc(layoutResult: LayoutResult): string {
+  const blockCount = layoutResult.blocks.length;
+  const connCount = layoutResult.connections.length;
+  const stats = layoutResult.signalTypeStats;
+  const statsParts: string[] = [];
+  const order: SignalType[] = ['audio', 'cv', 'pitch', 'gate', 'trigger', 'clock'];
+  for (const t of order) {
+    const n = stats[t] ?? 0;
+    if (n > 0) statsParts.push(`${n} ${t}`);
+  }
+
+  let summary = `Patch diagram with ${blockCount} module${blockCount === 1 ? '' : 's'} and ${connCount} connection${connCount === 1 ? '' : 's'}.`;
+
+  if (blockCount > 0 && blockCount <= 6) {
+    const names = layoutResult.blocks.map(b => sanitizeForSvg(b.label)).join(', ');
+    summary += ` Modules: ${names}.`;
+  }
+
+  if (statsParts.length > 0) {
+    summary += ` Signals: ${statsParts.join(', ')}.`;
+  }
+
+  return summary;
+}
+
+// ── Layer builders ──
+
+function buildBackground(theme: Theme, idPrefix: string, width: number, height: number): string {
+  if (!theme.grid) return '';
+  return `<rect width="${width}" height="${height}" fill="url(#${idPrefix}-dots)"/>`;
+}
+
+function buildCables(theme: Theme, connections: LayoutConnection[]): string {
+  const parts: string[] = [];
+  const tips: string[] = [];
+
+  for (const conn of connections) {
+    const cableColor = theme.cable.colors[conn.signalType];
+    parts.push(
+      `<path d="${conn.path}" stroke="${cableColor.stroke}" stroke-width="${theme.cable.width}" ` +
+      `fill="none" stroke-linecap="round" stroke-linejoin="round" ` +
+      `data-connection="${sanitizeForSvg(conn.id)}" data-signal="${conn.signalType}"/>`,
+    );
+    tips.push(
+      `<circle cx="${conn.sourcePoint.x}" cy="${conn.sourcePoint.y}" r="${theme.cable.plugTipRadius}" fill="${cableColor.plugTip}"/>`,
+    );
+    tips.push(
+      `<circle cx="${conn.targetPoint.x}" cy="${conn.targetPoint.y}" r="${theme.cable.plugTipRadius}" fill="${cableColor.plugTip}"/>`,
+    );
+  }
+
+  return parts.join('') + tips.join('');
+}
+
+function buildPanels(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): string {
+  const parts: string[] = [];
+
+  for (const block of blocks) {
+    const moduleName = sanitizeForSvg(block.parentModule || block.label);
+    const label = sanitizeForSvg(block.label);
+    const fontFamily = sanitizeForSvg(theme.label.fontFamily);
+
+    const insetX = block.x + 12;
+    const insetY = block.y + 8;
+    const insetW = block.width - 24;
+
+    let group = `<g data-module="${moduleName}" filter="url(#${idPrefix}-panel-shadow)">`;
+    // Main panel rect
+    group += `<rect x="${block.x}" y="${block.y}" width="${block.width}" height="${block.height}" ` +
+      `fill="${theme.panel.fill}" stroke="${theme.panel.stroke}" stroke-width="0.75" rx="${theme.panel.cornerRadius}"/>`;
+    // Top highlight bevel
+    group += `<line x1="${block.x}" y1="${block.y + 0.5}" x2="${block.x + block.width}" y2="${block.y + 0.5}" ` +
+      `stroke="${theme.panel.highlight}" stroke-width="${theme.panel.bevelWidth}"/>`;
+    // Bottom shadow bevel
+    group += `<line x1="${block.x}" y1="${block.y + block.height - 0.5}" x2="${block.x + block.width}" y2="${block.y + block.height - 0.5}" ` +
+      `stroke="${theme.panel.shadow}" stroke-width="0.5"/>`;
+    // Inset label recess
+    group += `<rect x="${insetX}" y="${insetY}" width="${insetW}" height="28" ` +
+      `fill="#f4f1ea" stroke="#c5c0b6" stroke-width="0.5"/>`;
+    // Label
+    group += `<text x="${block.x + block.width / 2}" y="${block.y + 22}" text-anchor="middle" ` +
+      `font-family="${fontFamily}" font-size="14" font-weight="700" ` +
+      `fill="${theme.label.color}" letter-spacing="3">${label}</text>`;
+    // Sub-label
+    if (block.subLabel) {
+      const subLabel = sanitizeForSvg(block.subLabel);
+      group += `<text x="${block.x + block.width / 2}" y="${block.y + 34}" text-anchor="middle" ` +
+        `font-family="${fontFamily}" font-size="9" fill="${theme.label.subColor}">${subLabel}</text>`;
+    }
+    group += `</g>`;
+    parts.push(group);
+  }
+
+  return parts.join('');
+}
+
+function buildParams(blocks: LayoutBlock[]): string {
+  const parts: string[] = [];
+  const monoFont = "'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace";
+
+  for (const block of blocks) {
+    const pw = block.width - 24;
+    const px = block.x + 12;
+    let py = block.y + 40;
+    for (const param of block.params) {
+      parts.push(
+        `<rect x="${px}" y="${py}" width="${pw}" height="20" fill="#f0ede6" stroke="#d5d0c6" stroke-width="0.5"/>`,
+      );
+      const text = `${sanitizeForSvg(param.key)}: ${sanitizeForSvg(param.value)}`;
+      parts.push(
+        `<text x="${px + pw / 2}" y="${py + 14}" text-anchor="middle" ` +
+        `font-family="${monoFont}" font-size="10" fill="#555">${text}</text>`,
+      );
+      py += 20;
+    }
+  }
+
+  return parts.join('');
+}
+
+function buildJacks(theme: Theme, idPrefix: string, blocks: LayoutBlock[]): string {
+  if (theme.port.hideSocket) return '';
+  const parts: string[] = [];
+  const c = theme.port.colors;
+
+  for (const block of blocks) {
+    for (const port of block.ports) {
+      const { x, y } = port.position;
+      const id = sanitizeForSvg(`${block.id}.${port.id}`);
+      let group = `<g data-port="${id}" filter="url(#${idPrefix}-jack-shadow)">`;
+      group += `<circle cx="${x}" cy="${y}" r="8" fill="${c.bezel}" stroke="${c.bezelStroke}" stroke-width="0.75"/>`;
+      group += `<circle cx="${x}" cy="${y}" r="5" fill="${c.ring}"/>`;
+      group += `<circle cx="${x}" cy="${y}" r="3" fill="${c.hole}"/>`;
+      group += `<circle cx="${x}" cy="${y}" r="1" fill="${c.pin}"/>`;
+      group += `</g>`;
+      parts.push(group);
+    }
+  }
+
+  return parts.join('');
+}
+
+function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
+  const parts: string[] = [];
+  const fontFamily = sanitizeForSvg(theme.port.fontFamily);
+
+  for (const block of blocks) {
+    for (const port of block.ports) {
+      const { x, y } = port.position;
+      const isOut = port.direction === 'out';
+      const labelX = isOut ? x + 14 : x - 14;
+      const labelY = y + 3;
+      const anchor = isOut ? 'start' : 'end';
+      const display = sanitizeForSvg(port.display);
+      parts.push(
+        `<text x="${labelX}" y="${labelY}" font-family="${fontFamily}" ` +
+        `font-size="${theme.port.fontSize}" fill="#1a1a1a" font-weight="600" ` +
+        `text-anchor="${anchor}">${display}</text>`,
+      );
+    }
+  }
+
+  return parts.join('');
+}
+
+function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string {
+  const parts: string[] = [];
+  const fontFamily = sanitizeForSvg(theme.annotation.fontFamily);
+
+  for (const conn of connections) {
+    if (!conn.annotation) continue;
+    const midX = (conn.sourcePoint.x + conn.targetPoint.x) / 2;
+    const midY = (conn.sourcePoint.y + conn.targetPoint.y) / 2;
+    const prefix = conn.isFeedback ? '↻ ' : '';
+    const text = prefix + sanitizeForSvg(conn.annotation);
+    parts.push(
+      `<text x="${midX}" y="${midY}" text-anchor="middle" ` +
+      `font-family="${fontFamily}" font-size="${theme.annotation.fontSize}" ` +
+      `fill="${theme.annotation.color}" ` +
+      `paint-order="stroke fill" stroke="#f7f5f0" stroke-width="3" stroke-linejoin="round">${text}</text>`,
+    );
+  }
+
+  return parts.join('');
+}
+
+function buildLegend(theme: Theme, layoutResult: LayoutResult): string {
+  const order: SignalType[] = ['audio', 'cv', 'pitch', 'gate', 'trigger', 'clock'];
+  const used = order.filter(t => (layoutResult.signalTypeStats[t] ?? 0) > 0);
+  if (used.length === 0) return '';
+
+  const parts: string[] = [];
+  const fontFamily = sanitizeForSvg(theme.annotation.fontFamily);
+  const itemWidth = 70;
+  const y = layoutResult.height - 20;
+  let x = 20;
+
+  for (const sig of used) {
+    const color = theme.cable.colors[sig].stroke;
+    let g = `<g transform="translate(${x}, ${y})">`;
+    g += `<line x1="0" y1="0" x2="20" y2="0" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
+    g += `<text x="26" y="3" font-family="${fontFamily}" font-size="9" fill="#666">${sig}</text>`;
+    g += `</g>`;
+    parts.push(g);
+    x += itemWidth;
+  }
+
+  return parts.join('');
+}
+
+// ── Main renderer ──
+
+export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
+  const idPrefix = genId();
+  const width = layoutResult.width;
+  const height = layoutResult.height;
+  const minWidth = Math.round(width);
+
+  const desc = buildDesc(layoutResult);
+
+  // Build defs
+  const defsParts: string[] = [];
+  defsParts.push(
+    `<filter id="${idPrefix}-panel-shadow" x="-20%" y="-20%" width="140%" height="140%">` +
+    `<feDropShadow dx="0" dy="2" stdDeviation="${theme.panel.shadowBlur}" flood-opacity="${theme.panel.shadowOpacity}"/>` +
+    `</filter>`,
+  );
+  defsParts.push(
+    `<filter id="${idPrefix}-jack-shadow" x="-20%" y="-20%" width="140%" height="140%">` +
+    `<feDropShadow dx="0" dy="0.5" stdDeviation="0.8" flood-opacity="0.15"/>` +
+    `</filter>`,
+  );
+  if (theme.grid) {
+    const spacing = theme.grid.spacing;
+    defsParts.push(
+      `<pattern id="${idPrefix}-dots" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse">` +
+      `<circle cx="${spacing / 2}" cy="${spacing / 2}" r="${theme.grid.dotRadius}" fill="${theme.grid.dotColor}" opacity="${theme.grid.opacity}"/>` +
+      `</pattern>`,
+    );
+  }
+
+  // Assemble layers
+  const layers = [
+    `<g class="pf-layer-bg">${buildBackground(theme, idPrefix, width, height)}</g>`,
+    `<g class="pf-layer-cables">${buildCables(theme, layoutResult.connections)}</g>`,
+    `<g class="pf-layer-panels" >${buildPanels(theme, idPrefix, layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-params">${buildParams(layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-jacks">${buildJacks(theme, idPrefix, layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-labels">${buildLabels(theme, layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-annotations">${buildAnnotations(theme, layoutResult.connections)}</g>`,
+    `<g class="pf-layer-legend">${buildLegend(theme, layoutResult)}</g>`,
+  ].join('');
+
+  const style =
+    `<style>@media print { .pf-panel, .pf-jack { filter: none; } }</style>`;
+
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" ` +
+    `data-pf-min-width="${minWidth}" role="img" aria-labelledby="${idPrefix}-title ${idPrefix}-desc">` +
+    `<title id="${idPrefix}-title">Patch diagram</title>` +
+    `<desc id="${idPrefix}-desc">${desc}</desc>` +
+    style +
+    `<defs>${defsParts.join('')}</defs>` +
+    layers +
+    `</svg>`;
+
+  return svg;
+}
