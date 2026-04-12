@@ -103,6 +103,12 @@ export interface LayoutResult {
   width: number;
   height: number;
   signalTypeStats: Partial<Record<SignalType, number>>;
+  /**
+   * Non-fatal diagnostics produced during layout. Currently used to surface
+   * internal consistency issues (e.g. computed height doesn't cover the
+   * actual block content) so future regressions are visible.
+   */
+  warnings?: string[];
 }
 
 // ── Theme Types ──

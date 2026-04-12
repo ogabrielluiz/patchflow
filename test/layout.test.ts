@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
-import { layout } from '../src/layout';
+import { layout, checkHeightInvariant } from '../src/layout';
 import { parse } from '../src/parser';
-import type { PatchGraph } from '../src/types';
+import type { LayoutBlock, PatchGraph } from '../src/types';
 
 function parseGraph(input: string): PatchGraph {
   const result = parse(input);
@@ -304,5 +304,85 @@ describe('layout', () => {
     for (const c of result.connections) {
       expect(c.path).not.toContain('NaN');
     }
+  });
+
+  describe('post-layout invariants', () => {
+    it('returns an empty warnings list when layout is consistent', () => {
+      const graph = parseGraph('- A (Out) >> B (In)');
+      const result = layout(graph);
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('produces no warnings for diagrams that include feedback', () => {
+      const graph = parseGraph([
+        '- A (Out) >> B (In)',
+        '- B (Out) >> A (In)',
+      ].join('\n'));
+      const result = layout(graph);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('keeps the computed height at or above every block bottom', () => {
+      const graph = parseGraph([
+        '- A (Out) >> B (In)',
+        '- B (Out) >> C (In)',
+        '- C (Out) >> D (In)',
+      ].join('\n'));
+      const result = layout(graph);
+      const maxBottom = Math.max(...result.blocks.map(b => b.y + b.height));
+      expect(result.height).toBeGreaterThanOrEqual(maxBottom);
+      expect(result.warnings).toEqual([]);
+    });
+  });
+
+  describe('checkHeightInvariant', () => {
+    const block = (y: number, height: number): LayoutBlock => ({
+      id: 'b', label: 'B', subLabel: null, params: [], ports: [],
+      parentModule: null, x: 0, y, width: 100, height,
+    });
+
+    it('returns no warnings when height covers block content', () => {
+      const warnings = checkHeightInvariant({
+        blocks: [block(0, 100)],
+        height: 120,
+        hasFeedback: false,
+        feedbackBottom: 0,
+      });
+      expect(warnings).toEqual([]);
+    });
+
+    it('warns when computed height is below block bottom', () => {
+      const warnings = checkHeightInvariant({
+        blocks: [block(0, 200)],
+        height: 100,
+        hasFeedback: false,
+        feedbackBottom: 0,
+      });
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('computed height');
+      expect(warnings[0]).toContain('below content bottom');
+    });
+
+    it('warns when feedback-arc bottom extends past computed height', () => {
+      const warnings = checkHeightInvariant({
+        blocks: [block(0, 100)],
+        height: 150,
+        hasFeedback: true,
+        feedbackBottom: 200,
+      });
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('200');
+    });
+
+    it('handles empty block lists without throwing', () => {
+      const warnings = checkHeightInvariant({
+        blocks: [],
+        height: 0,
+        hasFeedback: false,
+        feedbackBottom: 0,
+      });
+      expect(warnings).toEqual([]);
+    });
   });
 });

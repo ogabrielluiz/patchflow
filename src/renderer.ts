@@ -335,7 +335,10 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[], layoutH
     );
   });
 
-  // Notes panel in bottom-left, stacked upward above the legend line
+  // Notes panel in bottom-left, stacked upward above the legend line.
+  // `layoutHeight` here is the viewBox-relative diagram bottom (content height
+  // plus bottom padding), so `- 10` sits inside the padded bottom area and
+  // never overlaps block content.
   const panelX = -120;
   const lineGap = 16;
   const noteCount = annotated.length;
@@ -358,7 +361,7 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[], layoutH
   return parts.join('');
 }
 
-function buildLegend(theme: Theme, layoutResult: LayoutResult): string {
+function buildLegend(theme: Theme, layoutResult: LayoutResult, diagramBottom: number): string {
   const order: SignalType[] = ['audio', 'cv', 'pitch', 'gate', 'trigger', 'clock'];
   const used = order.filter(t => (layoutResult.signalTypeStats[t] ?? 0) > 0);
   if (used.length === 0) return '';
@@ -369,7 +372,9 @@ function buildLegend(theme: Theme, layoutResult: LayoutResult): string {
   const totalWidth = used.length * itemWidth;
   // Right-align: place the legend's right edge at layoutResult.width
   const legendStartX = layoutResult.width - totalWidth;
-  const y = layoutResult.height - 20;
+  // Anchor the legend inside the viewBox's bottom padding so it never
+  // overlaps block/panel content.
+  const y = diagramBottom - 20;
 
   for (let i = 0; i < used.length; i++) {
     const sig = used[i];
@@ -416,21 +421,6 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
     );
   }
 
-  // Assemble layers
-  const layers = [
-    `<g class="pf-layer-bg">${buildBackground(theme, idPrefix, width, height)}</g>`,
-    `<g class="pf-layer-cables">${buildCables(theme, layoutResult.connections)}</g>`,
-    `<g class="pf-layer-panels" >${buildPanels(theme, idPrefix, layoutResult.blocks)}</g>`,
-    `<g class="pf-layer-params">${buildParams(layoutResult.blocks, theme)}</g>`,
-    `<g class="pf-layer-jacks">${buildJacks(theme, idPrefix, layoutResult.blocks)}</g>`,
-    `<g class="pf-layer-labels">${buildLabels(theme, layoutResult.blocks, layoutResult.connections)}</g>`,
-    `<g class="pf-layer-annotations">${buildAnnotations(theme, layoutResult.connections, height)}</g>`,
-    `<g class="pf-layer-legend">${buildLegend(theme, layoutResult)}</g>`,
-  ].join('');
-
-  const style =
-    `<style>@media print { .pf-panel, .pf-jack { filter: none; } }</style>`;
-
   // Port labels are now stacked vertically above/below sockets, so horizontal
   // padding only needs to clear the socket jacket (radius 8) plus a small buffer.
   // Annotation notes anchor to x = -120, so keep enough left padding for them
@@ -449,6 +439,26 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
   const notesHeight = noteCount > 0 ? noteCount * 16 + 10 : 0;
   const bottomPad = Math.max(40, notesHeight + 10);
   const vbHeight = height + topPad + bottomPad;
+
+  // `diagramBottom` is the Y coordinate of the viewBox's bottom edge. Legend
+  // and notes are positioned relative to this so they render INSIDE the
+  // bottom padding, not inside the block content area (which ends at `height`).
+  const diagramBottom = height + bottomPad;
+
+  // Assemble layers
+  const layers = [
+    `<g class="pf-layer-bg">${buildBackground(theme, idPrefix, width, height)}</g>`,
+    `<g class="pf-layer-cables">${buildCables(theme, layoutResult.connections)}</g>`,
+    `<g class="pf-layer-panels" >${buildPanels(theme, idPrefix, layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-params">${buildParams(layoutResult.blocks, theme)}</g>`,
+    `<g class="pf-layer-jacks">${buildJacks(theme, idPrefix, layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-labels">${buildLabels(theme, layoutResult.blocks, layoutResult.connections)}</g>`,
+    `<g class="pf-layer-annotations">${buildAnnotations(theme, layoutResult.connections, diagramBottom)}</g>`,
+    `<g class="pf-layer-legend">${buildLegend(theme, layoutResult, diagramBottom)}</g>`,
+  ].join('');
+
+  const style =
+    `<style>@media print { .pf-panel, .pf-jack { filter: none; } }</style>`;
 
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-labelPadX} ${-topPad} ${vbWidth} ${vbHeight}" width="100%" ` +

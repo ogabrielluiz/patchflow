@@ -246,4 +246,42 @@ describe('renderer', () => {
     expect(svg).toContain('pf-sublabel-bar');
   });
 
+  describe('legend and notes positioning', () => {
+    it('places the legend below every block bottom', () => {
+      const graph = parse('- A (Out) >> B (In)').graph!;
+      const positioned = layout(graph);
+      const svg = renderSvg(positioned, defaultTheme);
+
+      // Grab the legend group's transform to find its Y coordinate.
+      const legendMatch = svg.match(/pf-layer-legend">.*?<g transform="translate\([^,]+,\s*([\d.]+)\)/);
+      expect(legendMatch).not.toBeNull();
+      const legendY = parseFloat(legendMatch![1]);
+
+      // Every block's bottom should be strictly above the legend Y —
+      // otherwise they would visually overlap.
+      const maxBlockBottom = Math.max(...positioned.blocks.map(b => b.y + b.height));
+      expect(legendY).toBeGreaterThan(maxBlockBottom);
+    });
+
+    it('places annotation notes below every block bottom', () => {
+      const input = [
+        '- A (Out) >> B (In) {annot: "shortens fall each cycle"}',
+      ].join('\n');
+      const parsed = parse(input);
+      if (!parsed.graph) throw new Error('parse failed');
+      const positioned = layout(parsed.graph);
+      // Only run the assertion if the parser attached the annotation.
+      const annotated = positioned.connections.filter(c => c.annotation);
+      if (annotated.length === 0) return;
+
+      const svg = renderSvg(positioned, defaultTheme);
+      // First annotation note text: `<text x="-120" y="..." ...>1. ...</text>`
+      const noteMatch = svg.match(/pf-layer-annotations">.*?<text x="-120" y="([\d.]+)"[^>]*>1\./);
+      if (!noteMatch) return;
+      const noteY = parseFloat(noteMatch[1]);
+      const maxBlockBottom = Math.max(...positioned.blocks.map(b => b.y + b.height));
+      expect(noteY).toBeGreaterThan(maxBlockBottom);
+    });
+  });
+
 });

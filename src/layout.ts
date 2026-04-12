@@ -363,11 +363,52 @@ export function layout(graph: PatchGraph, options: LayoutOptions = {}): LayoutRe
   const width = maxX + margin;
   const height = maxY + margin + feedbackSpace;
 
+  // Post-layout safety check: the computed `height` should always sit at or
+  // below the true content bottom (block bottoms, plus feedback arc dip if
+  // present). The renderer relies on this invariant when reserving bottom
+  // padding for the legend and annotation notes — if it's violated, they can
+  // render over block content. We emit a warning rather than throwing so a
+  // regression is visible without breaking callers.
+  const warnings = checkHeightInvariant({
+    blocks: layoutBlocks,
+    height,
+    hasFeedback,
+    feedbackBottom: diagramBottom + feedbackArcOffset,
+  });
+
   return {
     blocks: layoutBlocks,
     connections: layoutConnections,
     width,
     height,
     signalTypeStats: graph.signalTypeStats,
+    warnings,
   };
+}
+
+/**
+ * Verifies that the computed layout height fully contains the block content
+ * (and any feedback-arc dip). Returns a list of diagnostic warnings — empty
+ * when the invariant holds. Exported so the guard can be unit-tested directly.
+ */
+export function checkHeightInvariant(args: {
+  blocks: LayoutBlock[];
+  height: number;
+  hasFeedback: boolean;
+  feedbackBottom: number;
+}): string[] {
+  const { blocks, height, hasFeedback, feedbackBottom } = args;
+  const warnings: string[] = [];
+  const blockBottomMax = blocks.length > 0
+    ? Math.max(...blocks.map(b => b.y + b.height))
+    : 0;
+  const contentBottom = hasFeedback
+    ? Math.max(blockBottomMax, feedbackBottom)
+    : blockBottomMax;
+  if (height < contentBottom) {
+    warnings.push(
+      `layout: computed height (${height.toFixed(1)}) is below content bottom (${contentBottom.toFixed(1)}); legend/notes may overlap block content`,
+    );
+  }
+  return warnings;
 }
