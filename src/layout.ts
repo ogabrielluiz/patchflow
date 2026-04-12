@@ -196,7 +196,7 @@ function findPortPosition(
 
 export function layout(graph: PatchGraph, options: LayoutOptions = {}): LayoutResult {
   const direction = options.direction ?? 'LR';
-  const rankSep = options.rankSep ?? 160;
+  const rankSep = options.rankSep ?? 200;
   const nodeSep = options.nodeSep ?? 40;
 
   const allBlocks: Block[] = [...graph.declaredBlocks, ...graph.stubBlocks];

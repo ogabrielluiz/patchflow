@@ -236,55 +236,67 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
 }
 
 function buildAnnotations(theme: Theme, connections: LayoutConnection[]): string {
+  const annotated = connections.filter(c => c.annotation);
+  if (annotated.length === 0) return '';
+
   const parts: string[] = [];
   const fontFamily = sanitizeForSvg(theme.annotation.fontFamily);
-  const fontSize = theme.annotation.fontSize;
-  // Approximate character width for truncation (in pixels, for the annotation font size)
-  const charWidth = fontSize * 0.55;
+  const noteFontSize = theme.annotation.fontSize + 1;
+  const markerFontFamily = fontFamily;
 
-  for (const conn of connections) {
-    if (!conn.annotation) continue;
+  // Numbered markers on cables
+  annotated.forEach((conn, i) => {
+    const num = i + 1;
     const sx = conn.sourcePoint.x;
     const sy = conn.sourcePoint.y;
     const tx = conn.targetPoint.x;
     const ty = conn.targetPoint.y;
 
-    let x: number;
-    let y: number;
+    let mx: number;
+    let my: number;
 
     if (conn.isFeedback) {
-      // Feedback arcs dip below the diagram — place annotation near the arc's low point.
-      x = (sx + tx) / 2;
-      y = Math.max(sy, ty) + 30;
+      // Feedback arcs dip below the diagram — place marker at the arc's bottom-middle.
+      // The path format is: M sx sy L (sx+20) sy L (sx+20) arcY L (tx-20) arcY ...
+      // Extract arcY from the third point.
+      mx = (sx + tx) / 2;
+      const match = conn.path.match(/L\s+\S+\s+\S+\s+L\s+\S+\s+(\S+)/);
+      my = match ? parseFloat(match[1]) : Math.max(sy, ty) + 30;
     } else {
-      // Forward connections: position annotation ABOVE the midpoint
-      // so it doesn't overlap sockets / port labels on short connections.
-      x = (sx + tx) / 2;
-      y = (sy + ty) / 2 - 14;
+      mx = (sx + tx) / 2;
+      my = (sy + ty) / 2;
     }
 
-    const prefix = conn.isFeedback ? '↻ ' : '';
-    let raw = conn.annotation;
+    const markerStroke = conn.isFeedback
+      ? theme.cable.colors[conn.signalType].stroke
+      : theme.label.color;
 
-    // Truncate text that would be longer than the horizontal distance between
-    // source and target (avoids overflowing into adjacent sockets/labels).
-    if (!conn.isFeedback) {
-      const available = Math.abs(tx - sx);
-      const prefixWidth = prefix.length * charWidth;
-      const maxChars = Math.max(0, Math.floor((available - prefixWidth) / charWidth));
-      if (maxChars > 0 && raw.length > maxChars) {
-        raw = maxChars > 1 ? raw.slice(0, maxChars - 1) + '…' : raw.slice(0, maxChars);
-      }
-    }
-
-    const text = prefix + sanitizeForSvg(raw);
     parts.push(
-      `<text x="${x}" y="${y}" text-anchor="middle" ` +
-      `font-family="${fontFamily}" font-size="${fontSize}" ` +
-      `fill="${theme.annotation.color}" ` +
-      `paint-order="stroke fill" stroke="${theme.annotation.haloColor}" stroke-width="3" stroke-linejoin="round">${text}</text>`,
+      `<circle cx="${mx}" cy="${my}" r="8" fill="${theme.panel.highlight}" ` +
+      `stroke="${markerStroke}" stroke-width="0.5" data-annotation-marker="${num}"/>`,
     );
-  }
+    parts.push(
+      `<text x="${mx}" y="${my + 3}" text-anchor="middle" ` +
+      `font-family="${markerFontFamily}" font-size="9" ` +
+      `fill="${theme.label.color}">${num}</text>`,
+    );
+  });
+
+  // Notes panel in upper-left
+  const panelX = -120;
+  let panelY = 20;
+  const lineGap = 14;
+
+  annotated.forEach((conn, i) => {
+    const num = i + 1;
+    const noteText = `${num}. ${sanitizeForSvg(conn.annotation!)}`;
+    parts.push(
+      `<text x="${panelX}" y="${panelY}" ` +
+      `font-family="${fontFamily}" font-size="${noteFontSize}" ` +
+      `fill="${theme.annotation.color}">${noteText}</text>`,
+    );
+    panelY += lineGap;
+  });
 
   return parts.join('');
 }

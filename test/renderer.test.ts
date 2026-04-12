@@ -127,7 +127,7 @@ describe('renderer', () => {
     const svg = renderFromNotation(input);
     expect(svg).toContain('CH 1');
     expect(svg).toContain('CH 2');
-    expect(svg).toContain('↻');
+    expect(svg).toContain('shortens fall each cycle');
     expect(svg).not.toContain('NaN');
   });
 
@@ -157,16 +157,37 @@ describe('renderer', () => {
     expect(svg).toContain('sub-line');
   });
 
-  it('renders forward connection annotation above midpoint', () => {
-    const parseResult = parse('- A (Out) >> B (In) // modulates cutoff');
-    const layoutResult = layout(parseResult.graph!);
-    const svg = renderSvg(layoutResult, defaultTheme);
-    // Annotation text should be present without the feedback prefix
-    expect(svg).toContain('modulates cutoff');
-    expect(svg).not.toContain('↻ modulates cutoff');
+  it('renders annotation as a numbered marker on the cable and a note in upper-left', () => {
+    const graph = parse('- A (Out) >> B (In) // modulation depth').graph!;
+    const positioned = layout(graph);
+    const svg = renderSvg(positioned, defaultTheme);
+    // Note text appears in the annotations layer
+    expect(svg).toContain('modulation depth');
+    // A numbered marker (look for a specific pattern — e.g., text "1" inside a small circle)
+    expect(svg).toMatch(/<circle [^>]*r="8"[^>]*>/); // marker circle
+    expect(svg).toContain('1. modulation depth');
   });
 
-  it('renders feedback connection annotation with ↻ prefix and below arc', () => {
+  it('renders multiple annotations with sequential numbers', () => {
+    const graph = parse([
+      '- A (Out) >> B (In) // first',
+      '- B (Out) >> C (In) // second',
+    ].join('\n')).graph!;
+    const positioned = layout(graph);
+    const svg = renderSvg(positioned, defaultTheme);
+    expect(svg).toContain('1. first');
+    expect(svg).toContain('2. second');
+  });
+
+  it('omits notes panel when no annotations present', () => {
+    const graph = parse('- A (Out) >> B (In)').graph!;
+    const positioned = layout(graph);
+    const svg = renderSvg(positioned, defaultTheme);
+    // layer is still present but should not contain "1. " text
+    expect(svg).not.toMatch(/\d+\.\s/);
+  });
+
+  it('renders feedback annotation without ↻ prefix', () => {
     const input = [
       '- A (Out) >> B (In)',
       '- B (Out) >> A (In) // feedback loop',
@@ -174,21 +195,8 @@ describe('renderer', () => {
     const parseResult = parse(input);
     const layoutResult = layout(parseResult.graph!);
     const svg = renderSvg(layoutResult, defaultTheme);
-    expect(svg).toContain('↻');
-    expect(svg).toContain('feedback loop');
-  });
-
-  it('truncates long forward annotations to fit between endpoints', () => {
-    // Very long annotation on a short connection triggers truncation
-    // (raw.length > maxChars) in buildAnnotations.
-    const longText = 'this is a very long annotation that will definitely exceed the horizontal space between two adjacent modules and therefore must be truncated';
-    const parseResult = parse(`- A (Out) >> B (In) // ${longText}`);
-    const layoutResult = layout(parseResult.graph!);
-    const svg = renderSvg(layoutResult, defaultTheme);
-    // Ellipsis character should appear for truncated annotation
-    expect(svg).toContain('…');
-    // The full long text should not be present verbatim
-    expect(svg).not.toContain(longText);
+    expect(svg).toContain('1. feedback loop');
+    expect(svg).not.toContain('↻');
   });
 
   it('renders port signal-type pills in SVG', () => {
@@ -216,20 +224,4 @@ describe('renderer', () => {
     expect(svg).toContain('pf-sublabel-bar');
   });
 
-  it('truncates to raw slice when maxChars equals 1 (single-char fit)', () => {
-    // Force a very narrow truncation window: block labels close together.
-    // We construct a layout manually so sx and tx are almost equal.
-    const parseResult = parse('- A (Out) >> B (In) // xy');
-    const layoutResult = layout(parseResult.graph!);
-    // Collapse horizontal distance to force maxChars === 1 path
-    const conn = layoutResult.connections[0];
-    const fontSize = defaultTheme.annotation.fontSize;
-    const charWidth = fontSize * 0.55;
-    // distance just enough for 1 char
-    conn.sourcePoint = { ...conn.sourcePoint, x: 0 };
-    conn.targetPoint = { ...conn.targetPoint, x: charWidth * 1.5 };
-    const svg = renderSvg(layoutResult, defaultTheme);
-    // Since maxChars is 1, raw is sliced to 1 char without ellipsis
-    expect(svg).toContain('<text');
-  });
 });
