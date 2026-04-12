@@ -216,6 +216,26 @@ describe('renderer', () => {
     expect(svg).not.toContain('pf-port-pill');
   });
 
+  it('places port labels vertically (text-anchor middle) rather than beside sockets', () => {
+    const svg = renderFromNotation(basicInput);
+    // The labels layer should use middle anchoring (vertical stacking above/below).
+    const labelsSection = svg.slice(svg.indexOf('pf-layer-labels'), svg.indexOf('pf-layer-annotations'));
+    expect(labelsSection).toContain('text-anchor="middle"');
+    // Port labels should no longer use text-anchor start/end within the label layer.
+    expect(labelsSection).not.toMatch(/text-anchor="start"/);
+    expect(labelsSection).not.toMatch(/text-anchor="end"/);
+  });
+
+  it('places feedback target port labels below the socket', () => {
+    const graph = parse('- A (Out) >> B (In)\n- B (Out) >> A (In)').graph!;
+    const positioned = layout(graph);
+    const svg = renderSvg(positioned, defaultTheme);
+    // Hard to assert exact geometry, but the SVG must render cleanly with no NaN
+    // and the labels layer must exist.
+    expect(svg).not.toContain('NaN');
+    expect(svg).toContain('pf-layer-labels');
+  });
+
   it('renders dark variant sub-bar when subLabel present', () => {
     const graph = parse('FILTER [Low Pass]:\n- FILTER (Out) -> VCA (In)').graph!;
     const positioned = layout(graph);

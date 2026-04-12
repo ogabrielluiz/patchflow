@@ -176,7 +176,47 @@ const SIGNAL_PILL_LABEL: Record<SignalType, string> = {
   clock: 'clk',
 };
 
-function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
+// Direction threshold (px) — cables going upward by more than this are considered "straight up"
+const UPWARD_CABLE_THRESHOLD = 20;
+
+/**
+ * For each port, decide whether its label should be placed BELOW the socket
+ * (instead of the default ABOVE). The rule: if the cable at that socket heads
+ * vertically upward (by more than a threshold), flip the label below so it
+ * doesn't collide with the cable.
+ *
+ * Keyed by `${blockId}:${portId}:${direction}`.
+ */
+function computeLabelBelowMap(connections: LayoutConnection[]): Map<string, boolean> {
+  const map = new Map<string, boolean>();
+  for (const conn of connections) {
+    // Source (output) port: cable leaves the socket toward targetPoint.
+    // If targetPoint.y is significantly above sourcePoint.y, cable goes up → flip below.
+    const srcKey = `${conn.source.blockId}:${conn.source.portId}:out`;
+    const srcDy = conn.targetPoint.y - conn.sourcePoint.y;
+    if (srcDy < -UPWARD_CABLE_THRESHOLD) {
+      map.set(srcKey, true);
+    } else if (!map.has(srcKey)) {
+      map.set(srcKey, false);
+    }
+
+    // Target (input) port: cable arrives from sourcePoint. If cable approaches
+    // from below going up (sourcePoint.y > targetPoint.y by threshold), flip below.
+    // Feedback edges are U-shaped: they leave the source going DOWN, traverse
+    // the bottom, and arrive at the target going UP. So feedback targets always
+    // flip below.
+    const tgtKey = `${conn.target.blockId}:${conn.target.portId}:in`;
+    const tgtDy = conn.sourcePoint.y - conn.targetPoint.y;
+    if (conn.isFeedback || tgtDy > UPWARD_CABLE_THRESHOLD) {
+      map.set(tgtKey, true);
+    } else if (!map.has(tgtKey)) {
+      map.set(tgtKey, false);
+    }
+  }
+  return map;
+}
+
+function buildLabels(theme: Theme, blocks: LayoutBlock[], connections: LayoutConnection[]): string {
   const parts: string[] = [];
   const fontFamily = sanitizeForSvg(theme.port.fontFamily);
   const pillShow = theme.port.pill.show;
@@ -185,50 +225,52 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[]): string {
   const pillRadius = theme.port.pill.cornerRadius;
   const pillPadX = 3;
   const pillHeight = 11;
-  const pillGap = 6;
   const charWidth = 6.5;
+
+  // Vertical offsets relative to the socket center
+  const pillOffsetAbove = 20;  // pill center above socket
+  const nameOffsetAbove = 32;  // port name text y above socket
+  const pillOffsetBelow = 20;  // pill center below socket
+  const nameOffsetBelow = 32;  // port name text y below socket
+
+  const belowMap = computeLabelBelowMap(connections);
 
   for (const block of blocks) {
     for (const port of block.ports) {
       const { x, y } = port.position;
-      const isOut = port.direction === 'out';
-      const labelX = isOut ? x + 14 : x - 14;
-      const labelY = y + 3;
-      const anchor = isOut ? 'start' : 'end';
+      const key = `${block.id}:${port.id}:${port.direction}`;
+      const below = belowMap.get(key) === true;
       const display = sanitizeForSvg(port.display);
-      const labelWidth = port.display.length * charWidth;
+
+      // Port name text baseline: centered horizontally on socket; above or below the pill.
+      const textY = below ? y + nameOffsetBelow : y - nameOffsetAbove;
 
       parts.push(
-        `<text x="${labelX}" y="${labelY}" font-family="${fontFamily}" ` +
+        `<text x="${x}" y="${textY}" font-family="${fontFamily}" ` +
         `font-size="${theme.port.fontSize}" fill="${theme.port.labelColor}" font-weight="600" ` +
-        `text-anchor="${anchor}">${display}</text>`,
+        `text-anchor="middle">${display}</text>`,
       );
 
       if (pillShow && port.signalType) {
         const pillText = SIGNAL_PILL_LABEL[port.signalType];
         const pillWidth = pillText.length * charWidth + pillPadX * 2;
         const pillColor = theme.cable.colors[port.signalType].stroke;
-        // Position pill next to the label (away from the socket)
-        let pillX: number;
-        if (isOut) {
-          // socket → label → pill
-          pillX = labelX + labelWidth + pillGap;
-        } else {
-          // pill → label → socket; pill sits to the left of label's leftmost edge
-          pillX = labelX - labelWidth - pillGap - pillWidth;
-        }
-        const pillY = y - pillHeight / 2;
-        const textX = pillX + pillWidth / 2;
-        const textY = pillY + pillHeight / 2 + pillFontSize / 2 - 1;
+        // Pill centered horizontally on the socket, stacked between name and socket.
+        const pillCenterY = below ? y + pillOffsetBelow : y - pillOffsetAbove;
+        const pillX = x - pillWidth / 2;
+        const pillY = pillCenterY - pillHeight / 2;
+        const pillTextX = x;
+        const pillTextY = pillY + pillHeight / 2 + pillFontSize / 2 - 1;
         parts.push(
           `<rect class="pf-port-pill" x="${pillX}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" ` +
           `rx="${pillRadius}" fill="${pillColor}" data-signal="${port.signalType}"/>`,
         );
         parts.push(
-          `<text class="pf-port-pill-text" x="${textX}" y="${textY}" text-anchor="middle" ` +
+          `<text class="pf-port-pill-text" x="${pillTextX}" y="${pillTextY}" text-anchor="middle" ` +
           `font-family="${fontFamily}" font-size="${pillFontSize}" fill="${pillTextColor}" font-weight="600">${sanitizeForSvg(pillText)}</text>`,
         );
       }
+
     }
   }
 
@@ -370,7 +412,7 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
     `<g class="pf-layer-panels" >${buildPanels(theme, idPrefix, layoutResult.blocks)}</g>`,
     `<g class="pf-layer-params">${buildParams(layoutResult.blocks, theme)}</g>`,
     `<g class="pf-layer-jacks">${buildJacks(theme, idPrefix, layoutResult.blocks)}</g>`,
-    `<g class="pf-layer-labels">${buildLabels(theme, layoutResult.blocks)}</g>`,
+    `<g class="pf-layer-labels">${buildLabels(theme, layoutResult.blocks, layoutResult.connections)}</g>`,
     `<g class="pf-layer-annotations">${buildAnnotations(theme, layoutResult.connections, height)}</g>`,
     `<g class="pf-layer-legend">${buildLegend(theme, layoutResult)}</g>`,
   ].join('');
@@ -378,23 +420,27 @@ export function renderSvg(layoutResult: LayoutResult, theme: Theme): string {
   const style =
     `<style>@media print { .pf-panel, .pf-jack { filter: none; } }</style>`;
 
-  // Extend the viewBox horizontally so port labels ("Fall CV", etc.) on the
-  // leftmost and rightmost blocks don't get clipped outside the SVG.
+  // Port labels are now stacked vertically above/below sockets, so horizontal
+  // padding only needs to clear the socket jacket (radius 8) plus a small buffer.
+  // Annotation notes anchor to x = -120, so keep enough left padding for them
+  // (they still read as margin-text aligned with the legend).
   const labelPadX = 130;
   const vbWidth = width + labelPadX * 2;
 
+  // Top padding: room for port name + pill stacked above the topmost socket
+  // (~40px: pill center at -20, text baseline at -32, plus text height).
+  const topPad = 40;
   // Bottom padding must accommodate:
+  //   • port labels below sockets on the bottommost row (~40px)
   //   • legend row: ~30px
-  //   • observation notes (bottom-left, stacked upward above legend):
-  //     topmost note sits at height - 10 - (noteCount-1)*16
-  //     so we need notesHeight + 10 px of padding below height for them to be visible
+  //   • observation notes (bottom-left, stacked upward above legend)
   const noteCount = layoutResult.connections.filter(c => c.annotation).length;
   const notesHeight = noteCount > 0 ? noteCount * 16 + 10 : 0;
-  const bottomPad = Math.max(30, notesHeight + 10);
-  const vbHeight = height + bottomPad;
+  const bottomPad = Math.max(40, notesHeight + 10);
+  const vbHeight = height + topPad + bottomPad;
 
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-labelPadX} 0 ${vbWidth} ${vbHeight}" width="100%" ` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-labelPadX} ${-topPad} ${vbWidth} ${vbHeight}" width="100%" ` +
     `data-pf-min-width="${minWidth + labelPadX * 2}" role="img" aria-labelledby="${idPrefix}-title ${idPrefix}-desc">` +
     `<title id="${idPrefix}-title">Patch diagram</title>` +
     `<desc id="${idPrefix}-desc">${desc}</desc>` +
