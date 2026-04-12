@@ -58,7 +58,7 @@ export const defaultTheme: Theme = {
   annotation: {
     fontFamily: "'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace",
     fontSize: 9,
-    color: '#888888',
+    color: '#4a4a4a',
     haloColor: '#f7f5f0',
   },
   grid: {

@@ -216,14 +216,16 @@ describe('renderer', () => {
     expect(svg).not.toContain('pf-port-pill');
   });
 
-  it('places port labels vertically (text-anchor middle) rather than beside sockets', () => {
+  it('anchors port name labels outside the block edge (start for outputs, end for inputs)', () => {
     const svg = renderFromNotation(basicInput);
-    // The labels layer should use middle anchoring (vertical stacking above/below).
+    // Port-name text is shifted horizontally OUTSIDE the block so it never
+    // straddles the panel boundary. Output ports use text-anchor="start" (label
+    // extends right of the socket), input ports use text-anchor="end" (label
+    // extends left of the socket). Pill text stays centered on the pill (middle).
     const labelsSection = svg.slice(svg.indexOf('pf-layer-labels'), svg.indexOf('pf-layer-annotations'));
+    expect(labelsSection).toMatch(/text-anchor="start"/);
+    expect(labelsSection).toMatch(/text-anchor="end"/);
     expect(labelsSection).toContain('text-anchor="middle"');
-    // Port labels should no longer use text-anchor start/end within the label layer.
-    expect(labelsSection).not.toMatch(/text-anchor="start"/);
-    expect(labelsSection).not.toMatch(/text-anchor="end"/);
   });
 
   it('places feedback target port labels below the socket', () => {

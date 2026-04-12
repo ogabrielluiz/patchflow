@@ -235,36 +235,49 @@ function buildLabels(theme: Theme, blocks: LayoutBlock[], connections: LayoutCon
 
   const belowMap = computeLabelBelowMap(connections);
 
+  // Horizontal offset from socket to label edge — keeps label fully outside the
+  // block panel so text never straddles the panel boundary (which caused clipping
+  // against the cream fill in dark mode).
+  const labelOffsetX = 6;
+
   for (const block of blocks) {
     for (const port of block.ports) {
       const { x, y } = port.position;
       const key = `${block.id}:${port.id}:${port.direction}`;
       const below = belowMap.get(key) === true;
       const display = sanitizeForSvg(port.display);
+      const isOutput = port.direction === 'out';
 
-      // Port name text baseline: centered horizontally on socket; above or below the pill.
+      // Port name text baseline: vertically above or below the socket, but shifted
+      // horizontally OUTSIDE the block edge (right of output, left of input).
       const textY = below ? y + nameOffsetBelow : y - nameOffsetAbove;
+      const textX = isOutput ? x + labelOffsetX : x - labelOffsetX;
+      const textAnchor = isOutput ? 'start' : 'end';
 
       parts.push(
-        `<text x="${x}" y="${textY}" font-family="${fontFamily}" ` +
+        `<text x="${textX}" y="${textY}" font-family="${fontFamily}" ` +
         `font-size="${theme.port.fontSize}" fill="${theme.port.labelColor}" font-weight="600" ` +
-        `text-anchor="middle" dominant-baseline="central">${display}</text>`,
+        `text-anchor="${textAnchor}" dominant-baseline="central">${display}</text>`,
       );
 
       if (pillShow && port.signalType) {
         const pillText = SIGNAL_PILL_LABEL[port.signalType];
         const pillWidth = pillText.length * charWidth + pillPadX * 2;
         const pillColor = theme.cable.colors[port.signalType].stroke;
-        // Pill centered horizontally on the socket, stacked between name and socket.
+        // Pill is stacked between name and socket vertically, and shifted outside
+        // the block edge horizontally (adjacent to the port name above/below it).
         const pillCenterY = below ? y + pillOffsetBelow : y - pillOffsetAbove;
-        const pillX = x - pillWidth / 2;
+        const pillX = isOutput
+          ? x + labelOffsetX
+          : x - labelOffsetX - pillWidth;
         const pillY = pillCenterY - pillHeight / 2;
+        const pillTextX = pillX + pillWidth / 2;
         parts.push(
           `<rect class="pf-port-pill" x="${pillX}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" ` +
           `rx="${pillRadius}" fill="${pillColor}" data-signal="${port.signalType}"/>`,
         );
         parts.push(
-          `<text class="pf-port-pill-text" x="${x}" y="${pillCenterY}" text-anchor="middle" dominant-baseline="central" ` +
+          `<text class="pf-port-pill-text" x="${pillTextX}" y="${pillCenterY}" text-anchor="middle" dominant-baseline="central" ` +
           `font-family="${fontFamily}" font-size="${pillFontSize}" fill="${pillTextColor}" font-weight="600">${sanitizeForSvg(pillText)}</text>`,
         );
       }
@@ -309,7 +322,7 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[], layoutH
 
     const markerStroke = conn.isFeedback
       ? theme.cable.colors[conn.signalType].stroke
-      : theme.label.color;
+      : theme.annotation.color;
 
     parts.push(
       `<circle cx="${mx}" cy="${my}" r="8" fill="${theme.panel.highlight}" ` +
@@ -318,7 +331,7 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[], layoutH
     parts.push(
       `<text x="${mx}" y="${my + 3}" text-anchor="middle" ` +
       `font-family="${markerFontFamily}" font-size="9" ` +
-      `fill="${theme.label.color}">${num}</text>`,
+      `fill="${theme.annotation.color}">${num}</text>`,
     );
   });
 
@@ -338,7 +351,7 @@ function buildAnnotations(theme: Theme, connections: LayoutConnection[], layoutH
     parts.push(
       `<text x="${panelX}" y="${noteY}" ` +
       `font-family="${fontFamily}" font-size="${noteFontSize}" font-weight="600" ` +
-      `fill="${theme.label.color}">${noteText}</text>`,
+      `fill="${theme.annotation.color}">${noteText}</text>`,
     );
   });
 
