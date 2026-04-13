@@ -1,0 +1,48 @@
+name: Lint PR title
+
+# Validates PR titles against the Conventional Commits spec so that squash
+# merges produce a clean git history and the release-notes categorizer in
+# .github/release.yml has something consistent to work with.
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Keep these in sync with commitlint.config.js.
+          types: |
+            feat
+            fix
+            docs
+            test
+            chore
+            refactor
+            perf
+            build
+            ci
+            style
+            revert
+          requireScope: false
+          subjectPattern: '^(?![A-Z])(?!.*\.$).+'
+          subjectPatternError: |
+            The subject ("{subject}") must start with a lowercase letter and
+            must not end with a period. Example: "feat: add dark theme".
