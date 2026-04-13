@@ -1,0 +1,79 @@
+---
+title: patchflow
+description: Eurorack patch diagram renderer. Patchbook-compatible notation to skeuomorphic SVG block diagrams.
+template: splash
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import Hero from '../../components/Hero.astro';
+import Patch from '../../components/Patch.astro';
+
+<Hero />
+
+## Why patchflow?
+
+<CardGrid>
+  <Card title="Patchbook-compatible" icon="document">
+    Uses the notation you might already know. Modules, ports, parameters, signal
+    operators — same vocabulary as the Patchbook ecosystem.
+  </Card>
+  <Card title="Skeuomorphic, not cartoonish" icon="pencil">
+    Rendering that feels like a real panel — bevels, cable plugs, socket bezels,
+    parameter plates — without slipping into kitsch.
+  </Card>
+  <Card title="Deterministic layout" icon="setting">
+    Built on dagre. Identical input yields identical SVG. Perfect for CI-generated
+    docs that stay in lockstep with your patches.
+  </Card>
+  <Card title="Fully themeable" icon="seti:stylus">
+    Deep-partial theme merge. Swap cable colors, panel finish, fonts, or plug tips
+    without forking the renderer.
+  </Card>
+  <Card title="TypeScript first" icon="seti:typescript">
+    Types re-exported at every layer of the pipeline — `parse`, `layout`, `renderSvg`.
+    Build your own tooling on top.
+  </Card>
+  <Card title="No browser required" icon="seti:default">
+    Renders to an SVG string. Use it in Node, Bun, the browser, a CLI, or a GitHub
+    Action. The samples in this site are regenerated on every push.
+  </Card>
+</CardGrid>
+
+## One render, two halves
+
+The library separates *parsing*, *layout*, and *drawing*. You can use the full
+pipeline with `render()`, or swap any stage for your own.
+
+```ts
+import { render } from '@ogabrielluiz/patchflow';
+
+const svg = render(`
+- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)
+`);
+```
+
+<Patch source={`- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)`} caption="Rendered live at build time from the notation above." />
+
+## Ready to go?
+
+<CardGrid>
+  <Card title="Read the notation guide" icon="open-book">
+    [Notation syntax →](./guides/notation/) · [Signal operators →](./guides/operators/) · [Modules & voices →](./guides/structure/)
+  </Card>
+  <Card title="Tweak the look" icon="seti:stylus">
+    [Theming guide →](./guides/theming/) · [Layout options →](./guides/layout/)
+  </Card>
+  <Card title="Explore the gallery" icon="seti:image">
+    [Gallery →](./gallery/) — a curated set of real-world patches with the
+    notation that produced them.
+  </Card>
+  <Card title="Dive into the API" icon="seti:typescript">
+    [API reference →](./reference/api/) · [Types →](./reference/types/)
+  </Card>
+</CardGrid>

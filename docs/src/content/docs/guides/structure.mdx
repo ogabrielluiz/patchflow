@@ -1,0 +1,142 @@
+---
+title: Modules, voices, and params
+description: How patchflow models the structure of a patch — modules with ports, composite modules with sections, and voice groupings.
+---
+
+import Patch from '../../../components/Patch.astro';
+
+patchflow's graph model has three structural concepts above the individual
+connection: **modules**, **sections**, and **voices**. Understanding them
+helps you lay patches out cleanly.
+
+## Modules
+
+A module is any name that appears on either side of a connection. The first
+time patchflow sees `Filter`, it creates a block for it. If you never declare
+it, that block has no parameters or subtitle — it's a **stub block**.
+
+```text
+- Oscillator (Out) -> Filter (In)
+```
+
+<Patch source={`- Oscillator (Out) -> Filter (In)`} caption="Two stub blocks and a single audio cable." />
+
+## Declaring a module
+
+A declaration lets you attach a subtitle, parameters, or just pin down the
+exact capitalization. It's a header line ending with `:`, followed by zero or
+more parameter lines starting with `*`.
+
+```text
+Filter [Ladder]:
+* Cutoff: 2 kHz
+* Resonance: 0.7
+* Drive: moderate
+
+- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+```
+
+<Patch source={`Filter [Ladder]:
+* Cutoff: 2 kHz
+* Resonance: 0.7
+* Drive: moderate
+
+- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)`} caption="The subtitle sits under the module name; each param becomes a plate on the panel." />
+
+### Ports
+
+Ports aren't declared — they're inferred from the connection endpoints. A
+port used as a source is treated as an output; used as a target, an input.
+If the same port appears on both sides of connections across a patch, the
+layout step treats it as an output and the parser emits an
+`AMBIGUOUS_PORT_DIRECTION` warning so you can investigate.
+
+## Sections (composite modules)
+
+Some modules house multiple functional channels — think MATHS, Maths-like
+slope generators, or a multi-channel mixer. Declare the parent module, and
+address sections with `Module.Section`:
+
+```text
+MATHS:
+* CH 1: Cycle ON, Rise fast
+* CH 2: Attenuverter ~2 o'clock
+* CH 4: Cycle OFF
+
+- MATHS.CH 1 (OUT) >> MATHS.CH 2 (In)
+- MATHS.CH 4 (EOC) g> MATHS.CH 1 (Trig)
+```
+
+<Patch source={`MATHS:
+* CH 1: Cycle ON, Rise fast
+* CH 2: Attenuverter ~2 o'clock
+* CH 4: Cycle OFF
+
+- MATHS.CH 1 (OUT) >> MATHS.CH 2 (In)
+- MATHS.CH 4 (EOC) g> MATHS.CH 1 (Trig)`} caption="MATHS becomes three sibling panels — one per channel — each carrying its own parameter." />
+
+Each section is laid out as its own panel alongside its siblings. If every
+param on the declared parent matches a section name, the parser migrates the
+params into their sections and removes the parent block entirely (unless the
+parent is also directly wired). There is no outer "MATHS" bevel wrapping the
+sections — they sit side-by-side as independent panels, which is why the
+layout stays readable even when a composite module has many channels.
+
+## Voices
+
+Voice markers tag blocks with a voice name for post-processing. Add a header
+of the form `VOICE <name>:` and every block declared after it carries that
+name on its `voice` field.
+
+```text
+VOICE 1:
+- Osc1 (Out) -> Mixer (In1)
+- Env1 (Out) >> VCA1 (CV)
+
+VOICE 2:
+- Osc2 (Out) -> Mixer (In2)
+- Env2 (Out) >> VCA2 (CV)
+
+- Mixer (Out) -> Filter (In)
+- Filter (Out) -> Output (In)
+```
+
+<Patch source={`VOICE 1:
+- Osc1 (Out) -> Mixer (In1)
+- Env1 (Out) >> VCA1 (CV)
+
+VOICE 2:
+- Osc2 (Out) -> Mixer (In2)
+- Env2 (Out) >> VCA2 (CV)
+
+- Mixer (Out) -> Filter (In)
+- Filter (Out) -> Output (In)`} caption="Two voice strands feeding a shared mixer → filter → output chain." />
+
+:::caution
+Voices are parse-time metadata only. The built-in layout and renderer do not
+draw voices as groups. The tag is **frozen at each block's first
+appearance** — `Mixer` in the patch above is tagged `VOICE 1` because that
+is where it first shows up, and wiring it again below `VOICE 2:` doesn't
+change that. `Filter` and `Output`, which first appear only below
+`VOICE 2:`, carry `VOICE 2`. Read `graph.voices` and each block's `voice`
+field if you want to build your own voice overlay.
+:::
+
+## Parameters
+
+Parameter lines start with `*` and have the form `key: value`. Both halves are
+free text — patchflow doesn't validate them. They render as small plates
+stacked under the module's title.
+
+```text
+VCO:
+* Wave: saw
+* Octave: 2
+* Fine: +3
+```
+
+Use whatever vocabulary is natural for the module — position descriptions
+(`2 o'clock`), numeric values (`2 kHz`), or notes (`C3`). Long values are
+truncated with an ellipsis so the plate never overflows the module.

@@ -1,0 +1,137 @@
+---
+title: Gallery
+description: A curated tour of real patches — rendered by patchflow, paired with the notation that produced them.
+---
+
+import Patch from '../../components/Patch.astro';
+
+Each diagram below is rendered live from the notation in the adjacent code
+block. Copy, paste, tweak — they're all valid inputs to `render()`.
+
+## Bouncing ball
+
+A classic self-patched MATHS cell: CH 1 cycles, its own output retriggers
+CH 2 which in turn shortens CH 1's fall. The harder the ball bounces, the
+faster it falls — a physical feedback loop drawn as a feedback cable.
+
+```text
+MATHS:
+* CH 1: Cycle ON
+* CH 2: Attenuverter ~2 o'clock
+
+- MATHS.CH 1 (OUT) >> MATHS.CH 2 (In)
+- MATHS.CH 2 (Out) >> MATHS.CH 1 (Fall CV) // shortens fall each cycle
+```
+
+<Patch source={`MATHS:
+* CH 1: Cycle ON
+* CH 2: Attenuverter ~2 o'clock
+
+- MATHS.CH 1 (OUT) >> MATHS.CH 2 (In)
+- MATHS.CH 2 (Out) >> MATHS.CH 1 (Fall CV) // shortens fall each cycle`} />
+
+## Quadrature LFOs
+
+Two non-cycling slopes cross-trigger each other's EOR/EOC — the result is two
+LFOs 90° out of phase, useful for stereo movement or any time you want two
+related but distinct modulators.
+
+```text
+MATHS:
+* CH 1: Cycle OFF, Rise + Fall matched
+* CH 4: Cycle OFF, Rise + Fall matched
+
+- MATHS.CH 1 (EOR) g> MATHS.CH 4 (Trig)
+- MATHS.CH 4 (EOC) g> MATHS.CH 1 (Trig)
+- MATHS.CH 1 (OUT) >> Filter (Cutoff)
+- MATHS.CH 4 (OUT) >> VCA (CV)
+```
+
+<Patch source={`MATHS:
+* CH 1: Cycle OFF, Rise + Fall matched
+* CH 4: Cycle OFF, Rise + Fall matched
+
+- MATHS.CH 1 (EOR) g> MATHS.CH 4 (Trig)
+- MATHS.CH 4 (EOC) g> MATHS.CH 1 (Trig)
+- MATHS.CH 1 (OUT) >> Filter (Cutoff)
+- MATHS.CH 4 (OUT) >> VCA (CV)`} />
+
+## Simple chain
+
+The classic subtractive voice: oscillator, filter (with envelope modulation),
+VCA (with LFO tremolo). A good starting point for almost any patch.
+
+```text
+- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)
+```
+
+<Patch source={`- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)`} />
+
+## Filters with variants
+
+Two filters in series with `[bracket]` subtitles to disambiguate. Useful when
+you want a band-pass from discrete HP + LP stages, or when you want to show
+which variant of a module is in use.
+
+```text
+- Oscillator (Out) -> HPF (In)
+HPF [High Pass]:
+* Cutoff: 200 Hz
+
+- HPF (Out) -> LPF (In)
+LPF [Low Pass]:
+* Cutoff: 2 kHz
+
+- LPF (Out) -> Output (In)
+```
+
+<Patch source={`- Oscillator (Out) -> HPF (In)
+HPF [High Pass]:
+* Cutoff: 200 Hz
+
+- HPF (Out) -> LPF (In)
+LPF [Low Pass]:
+* Cutoff: 2 kHz
+
+- LPF (Out) -> Output (In)`} />
+
+## Multi-voice
+
+Two voice strands running into a shared mixer → filter → output chain. The
+`VOICE 1:` / `VOICE 2:` markers tag each block's `voice` field for
+post-processing — the layout and renderer itself treat every block
+identically.
+
+```text
+VOICE 1:
+- Osc1 (Out) -> Mixer (In1)
+- Env1 (Out) >> VCA1 (CV)
+
+VOICE 2:
+- Osc2 (Out) -> Mixer (In2)
+- Env2 (Out) >> VCA2 (CV)
+
+- Mixer (Out) -> Filter (In)
+- Filter (Out) -> Output (In)
+```
+
+<Patch source={`VOICE 1:
+- Osc1 (Out) -> Mixer (In1)
+- Env1 (Out) >> VCA1 (CV)
+
+VOICE 2:
+- Osc2 (Out) -> Mixer (In2)
+- Env2 (Out) >> VCA2 (CV)
+
+- Mixer (Out) -> Filter (In)
+- Filter (Out) -> Output (In)`} />
+
+---
+
+Want to submit a patch to the gallery? [Open an issue or PR](https://github.com/ogabrielluiz/patchflow/issues).

@@ -1,0 +1,58 @@
+---
+import { render, darkTheme, defaultTheme } from '@ogabrielluiz/patchflow';
+
+interface Props {
+  source: string;
+  theme?: 'dark' | 'light' | 'auto';
+  caption?: string;
+}
+
+const { source, theme = 'auto', caption } = Astro.props;
+
+let lightSvg = '';
+let darkSvg = '';
+let error: string | null = null;
+
+try {
+  if (theme === 'light' || theme === 'auto') {
+    lightSvg = render(source, { theme: defaultTheme });
+  }
+  if (theme === 'dark' || theme === 'auto') {
+    darkSvg = render(source, { theme: darkTheme });
+  }
+} catch (err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  // In dev, keep the inline error so the page still renders and the author
+  // sees the issue while editing. In prod, fail the build — a broken sample
+  // is an authoring bug, not user input.
+  console.error(`[Patch.astro] render failed:\n${msg}\n--- source ---\n${source}`);
+  if (import.meta.env.PROD) {
+    throw new Error(`Patch render failed: ${msg}\n\nSource:\n${source}`);
+  }
+  error = msg;
+}
+---
+
+<figure class="inline-patch">
+  {error && <pre class="playground-error">{error}</pre>}
+  {!error && theme === 'auto' && (
+    <>
+      <div class="patch-light" set:html={lightSvg} />
+      <div class="patch-dark" set:html={darkSvg} />
+    </>
+  )}
+  {!error && theme === 'light' && <div set:html={lightSvg} />}
+  {!error && theme === 'dark' && <div set:html={darkSvg} />}
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .inline-patch figcaption {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-2);
+    text-align: center;
+  }
+  :global(:root[data-theme='light']) .patch-dark { display: none; }
+  :global(:root[data-theme='dark']) .patch-light { display: none; }
+</style>

@@ -1,0 +1,27 @@
+---
+title: Playground
+description: Type patchflow notation on the left, see the SVG rendered live on the right.
+pagefind: false
+---
+
+import Playground from '../../components/Playground.astro';
+
+Type any patchflow notation in the editor. The SVG on the right re-renders
+as you type — no install, no build step. Pick a preset to start from, toggle
+the theme, copy the SVG to your clipboard, or download it as a file.
+
+<Playground />
+
+:::tip
+The preview updates on every keystroke. When `render()` can't produce a
+diagram — for example, if the patch is empty — the thrown error message is
+shown in red in place of the SVG. Less-fatal parser diagnostics
+(ordinary syntax issues) are not surfaced here; call `parse()` directly in
+your own code if you need their line/column details.
+:::
+
+:::note
+This page runs the same `render()` function published to npm — so whatever
+you see here is exactly what you'd get from `import { render } from
+'@ogabrielluiz/patchflow'` in your own project.
+:::

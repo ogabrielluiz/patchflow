@@ -1,0 +1,102 @@
+---
+title: Quickstart
+description: Install patchflow and render your first patch in under a minute.
+---
+
+import { Tabs, TabItem, Steps, Code } from '@astrojs/starlight/components';
+import Patch from '../../../components/Patch.astro';
+
+## 1. Install
+
+<Tabs syncKey="pkg">
+  <TabItem label="npm">
+    ```bash
+    npm install @ogabrielluiz/patchflow
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @ogabrielluiz/patchflow
+    ```
+  </TabItem>
+  <TabItem label="bun">
+    ```bash
+    bun add @ogabrielluiz/patchflow
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @ogabrielluiz/patchflow
+    ```
+  </TabItem>
+</Tabs>
+
+patchflow ships ESM + CJS builds and its own TypeScript declarations. Its only
+runtime dependency is [dagre](https://github.com/dagrejs/dagre).
+
+## 2. Render a patch
+
+```ts title="render.ts"
+import { render } from '@ogabrielluiz/patchflow';
+import { writeFileSync } from 'node:fs';
+
+const svg = render(`
+- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)
+`);
+
+writeFileSync('patch.svg', svg);
+```
+
+That's it. You'll get an SVG you can drop into a README, a blog post, or a PDF.
+
+<Patch source={`- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)`} caption="Output of the snippet above, rendered at build time." />
+
+## 3. Switch to the dark theme
+
+```ts
+import { render, darkTheme } from '@ogabrielluiz/patchflow';
+
+const svg = render(notation, { theme: darkTheme });
+```
+
+Or override just the bits you care about:
+
+```ts
+const svg = render(notation, {
+  theme: {
+    cable: {
+      colors: {
+        audio: { stroke: '#ff5f7a', plugTip: '#d94963' },
+      },
+    },
+  },
+});
+```
+
+The theme object is deep-merged into the default — you never have to specify a
+full theme unless you want to. See the [Theming guide](../theming/) for the
+full surface.
+
+## 4. Try it live
+
+Head to the [Playground](../../playground/) to edit notation and see the SVG
+update in real time. Swap presets, toggle themes, copy the SVG to your
+clipboard, or download it as a file.
+
+## Next steps
+
+<Steps>
+
+1. Read the **[Notation syntax](../notation/)** page to learn the full grammar.
+2. Browse the **[Signal operators](../operators/)** to see the supported cable
+   types and their colors.
+3. Skim the **[API reference](../../reference/api/)** for the lower-level
+   `parse()` / `layout()` / `renderSvg()` entry points.
+
+</Steps>

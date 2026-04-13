@@ -1,0 +1,136 @@
+---
+const defaultNotation = `MATHS:
+* CH 1: Cycle ON
+* CH 2: Attenuverter ~2 o'clock
+
+- MATHS.CH 1 (OUT) >> MATHS.CH 2 (In)
+- MATHS.CH 2 (Out) >> MATHS.CH 1 (Fall CV) // shortens fall each cycle`;
+
+const presets = [
+  { name: 'Bouncing ball', value: defaultNotation },
+  {
+    name: 'Quadrature LFOs',
+    value: `MATHS:
+* CH 1: Cycle OFF, Rise + Fall matched
+* CH 4: Cycle OFF, Rise + Fall matched
+
+- MATHS.CH 1 (EOR) g> MATHS.CH 4 (Trig)
+- MATHS.CH 4 (EOC) g> MATHS.CH 1 (Trig)
+- MATHS.CH 1 (OUT) >> Filter (Cutoff)
+- MATHS.CH 4 (OUT) >> VCA (CV)`,
+  },
+  {
+    name: 'Simple chain',
+    value: `- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)`,
+  },
+  {
+    name: 'Multi-voice',
+    value: `VOICE 1:
+- Osc1 (Out) -> Mixer (In1)
+- Env1 (Out) >> VCA1 (CV)
+
+VOICE 2:
+- Osc2 (Out) -> Mixer (In2)
+- Env2 (Out) >> VCA2 (CV)
+
+- Mixer (Out) -> Filter (In)
+- Filter (Out) -> Output (In)`,
+  },
+];
+---
+
+<div class="playground-root">
+  <div class="playground-input">
+    <div class="playground-toolbar">
+      <label>
+        Preset:
+        <select id="pf-preset">
+          {presets.map((p) => <option value={p.value}>{p.name}</option>)}
+        </select>
+      </label>
+      <label>
+        Theme:
+        <select id="pf-theme">
+          <option value="dark" selected>dark</option>
+          <option value="light">light</option>
+        </select>
+      </label>
+      <button id="pf-copy" type="button">Copy SVG</button>
+      <button id="pf-download" type="button">Download</button>
+    </div>
+    <textarea id="pf-source" spellcheck="false">{defaultNotation}</textarea>
+  </div>
+  <div class="playground-output" id="pf-output" aria-live="polite"></div>
+</div>
+
+<script>
+  import { render, darkTheme } from '@ogabrielluiz/patchflow';
+
+  const source = document.getElementById('pf-source') as HTMLTextAreaElement;
+  const output = document.getElementById('pf-output') as HTMLDivElement;
+  const preset = document.getElementById('pf-preset') as HTMLSelectElement;
+  const themeSel = document.getElementById('pf-theme') as HTMLSelectElement;
+  const copyBtn = document.getElementById('pf-copy') as HTMLButtonElement;
+  const dlBtn = document.getElementById('pf-download') as HTMLButtonElement;
+
+  let lastSvg = '';
+
+  function run() {
+    const notation = source.value;
+    const useDark = themeSel.value === 'dark';
+    try {
+      const svg = render(notation, useDark ? { theme: darkTheme } : undefined);
+      lastSvg = svg;
+      output.innerHTML = svg;
+    } catch (err: any) {
+      lastSvg = '';
+      output.innerHTML = `<div class="playground-error">${escapeHtml(err?.message ?? String(err))}</div>`;
+    }
+  }
+
+  function escapeHtml(s: string) {
+    return s.replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]!));
+  }
+
+  let debounce: number | undefined;
+  source.addEventListener('input', () => {
+    window.clearTimeout(debounce);
+    debounce = window.setTimeout(run, 180);
+  });
+
+  preset.addEventListener('change', () => {
+    source.value = preset.value;
+    run();
+  });
+
+  themeSel.addEventListener('change', run);
+
+  copyBtn.addEventListener('click', async () => {
+    if (!lastSvg) return;
+    try {
+      await navigator.clipboard.writeText(lastSvg);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = 'Copy SVG'), 1200);
+    } catch {
+      copyBtn.textContent = 'Copy failed';
+    }
+  });
+
+  dlBtn.addEventListener('click', () => {
+    if (!lastSvg) return;
+    const blob = new Blob([lastSvg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'patchflow.svg';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  run();
+</script>

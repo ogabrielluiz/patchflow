@@ -1,0 +1,35 @@
+---
+import { render, darkTheme, defaultTheme } from '@ogabrielluiz/patchflow';
+
+const heroSource = `- Oscillator (Out) -> Filter (In)
+- Envelope (Out) >> Filter (Cutoff)
+- Filter (Out) -> VCA (In)
+- LFO (Out) >> VCA (CV)`;
+
+const light = render(heroSource, { theme: defaultTheme });
+const dark = render(heroSource, { theme: darkTheme });
+---
+
+<section class="patchflow-hero">
+  <div>
+    <h1>Patch diagrams,<br />as code.</h1>
+    <p class="tagline">
+      Describe your eurorack rig in a <a href="https://patchbook.io/" target="_blank" rel="noopener">Patchbook</a>-compatible text notation.
+      Render it as a skeuomorphic SVG block diagram — cables, sockets, parameter plates and all.
+    </p>
+    <div class="cta-row">
+      <a class="cta primary" href="./guides/quickstart/">Get started →</a>
+      <a class="cta secondary" href="./playground/">Try the playground</a>
+      <a class="cta secondary" href="https://github.com/ogabrielluiz/patchflow" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+  <div class="hero-svg">
+    <div class="patch-light" set:html={light} />
+    <div class="patch-dark" set:html={dark} />
+  </div>
+</section>
+
+<style>
+  :global(:root[data-theme='light']) .hero-svg .patch-dark { display: none; }
+  :global(:root[data-theme='dark']) .hero-svg .patch-light { display: none; }
+</style>
