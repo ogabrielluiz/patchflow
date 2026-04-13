@@ -303,16 +303,38 @@ describe('renderer', () => {
     });
 
     it('truncates overflowing param values', () => {
+      // Layout with a short param, then replace it with a much longer one
+      // post-layout so the block isn't resized to fit. This exercises the
+      // fitLabel fallback for cases where content is wider than the allocated
+      // plate (e.g. authored via direct LayoutBlock injection).
       const input = [
         'OSC:',
-        '* Shape: an extremely long parameter value that should be truncated with ellipsis in the rendered SVG',
+        '* Shape: sine',
         '',
         '- OSC (Out) >> B (In)',
       ].join('\n');
       const graph = parse(input).graph!;
       const positioned = layout(graph);
+      positioned.blocks[0].params[0] = {
+        key: 'Shape',
+        value: 'an extremely long parameter value that should be truncated with ellipsis in the rendered SVG',
+      };
       const svg = renderSvg(positioned, defaultTheme);
       expect(svg).toContain('…');
+    });
+
+    it('fits the full param text when authored via notation (no false ellipsis)', () => {
+      const input = [
+        'MIXER:',
+        '* Chain switches: both down (6-into-1)',
+        '',
+        '- MIXER (Out) >> B (In)',
+      ].join('\n');
+      const graph = parse(input).graph!;
+      const positioned = layout(graph);
+      const svg = renderSvg(positioned, defaultTheme);
+      expect(svg).toContain('Chain switches: both down (6-into-1)');
+      expect(svg).not.toContain('Chain switches: both down (6-into-…');
     });
   });
 

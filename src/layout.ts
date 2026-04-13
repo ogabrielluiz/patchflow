@@ -20,17 +20,24 @@ const MIN_WIDTH = 140;
 const MIN_HEIGHT = 90;
 
 function getBlockDimensions(block: Block, portCount: number): { width: number; height: number } {
-  // Main label uses 14px bold with 3px letter-spacing, so per-char width is
-  // larger than plain 8px — use 11 to avoid overflow (matches renderer fit).
+  // Per-char widths match the renderer's fit assumptions: the main label is
+  // 14px bold with 3px letter-spacing (≈11px/char); sub-label and params are
+  // 10px plain (≈7px/char).
   const labelWidth = block.label.length * 11;
   const subLabelWidth = block.subLabel ? block.subLabel.length * 7 : 0;
   const paramWidths = block.params.map(p => (`${p.key}: ${p.value}`).length * 7);
   const longestParam = paramWidths.length > 0 ? Math.max(...paramWidths) : 0;
 
+  // Horizontal allowance per region, measured from content width to block width:
+  //   label:    24px inset recess margin + 16px safety         = 40
+  //   subLabel: 24px inset recess margin + 8px text padding + 8px safety = 40
+  //   param:    24px plate margin + 8px text padding  + 8px safety = 40
+  // Without the safety margin the param edge chops one character (off-by-two
+  // pixels vs. the renderer's `pw - 8` budget).
   const width = Math.max(
     labelWidth + 40,
     subLabelWidth + 40,
-    longestParam + 30,
+    longestParam + 40,
     MIN_WIDTH,
   );
 
