@@ -1,10 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 32" fill="none">
-  <rect x="1" y="5" width="24" height="22" rx="2" fill="#e8e4dc" stroke="#a8a39a" stroke-width="1"/>
-  <circle cx="8" cy="12" r="2.4" fill="#555" stroke="#a8a39a" stroke-width="0.6"/>
-  <circle cx="18" cy="12" r="2.4" fill="#555" stroke="#a8a39a" stroke-width="0.6"/>
-  <circle cx="8" cy="22" r="2.4" fill="#555" stroke="#a8a39a" stroke-width="0.6"/>
-  <circle cx="18" cy="22" r="2.4" fill="#555" stroke="#a8a39a" stroke-width="0.6"/>
-  <path d="M 18 12 C 34 4, 46 4, 60 16" stroke="#e88ca5" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-  <path d="M 18 22 C 40 30, 52 30, 62 22" stroke="#7bafd4" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-  <text x="66" y="22" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="currentColor">patchflow</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect x="2" y="2" width="28" height="28" rx="3" fill="#e8e4dc" stroke="#a8a39a" stroke-width="1.2"/>
+  <circle cx="10" cy="11" r="2.8" fill="#333"/>
+  <circle cx="22" cy="11" r="2.8" fill="#333"/>
+  <circle cx="10" cy="22" r="2.8" fill="#333"/>
+  <circle cx="22" cy="22" r="2.8" fill="#333"/>
+  <path d="M 10 11 C 14 4, 18 4, 22 11" stroke="#e88ca5" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M 10 22 C 14 29, 18 29, 22 22" stroke="#7bafd4" stroke-width="2.6" fill="none" stroke-linecap="round"/>
 </svg>
