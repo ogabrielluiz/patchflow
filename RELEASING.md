@@ -32,9 +32,32 @@ The `Release` workflow (`.github/workflows/release.yml`) then:
    PRs merged since the previous tag, grouped by label per
    `.github/release.yml`.
 
-### Label your PRs
+### Commit & PR title convention
 
-Release notes are grouped by PR label. Apply one of:
+This repo enforces [Conventional Commits](https://www.conventionalcommits.org)
+on two layers:
+
+- **Local commit-msg hook.** `bun install` runs `husky` via the `prepare`
+  script, which wires `.husky/commit-msg` to run `commitlint` against
+  `commitlint.config.js`. Bad messages are rejected before the commit lands.
+- **PR title CI.** `.github/workflows/pr-title.yml` runs
+  [`amannn/action-semantic-pull-request`](https://github.com/amannn/action-semantic-pull-request)
+  on every PR event. It fails the check if the PR title isn't a valid
+  conventional commit — important because squash-merging uses the PR title
+  as the commit subject.
+
+Allowed types (same list both places):
+
+`feat` · `fix` · `docs` · `test` · `chore` · `refactor` · `perf` · `build`
+· `ci` · `style` · `revert`
+
+Subjects must start with a lowercase letter and not end with a period.
+Scopes are optional: `feat(parser): ...` is fine, `feat: ...` is fine.
+
+### Label your PRs (release notes)
+
+Release notes are grouped by PR **label**, not commit type — the label is
+what GitHub's auto-generator reads. Apply one of:
 
 | Label | Section |
 |-------|---------|
@@ -45,6 +68,9 @@ Release notes are grouped by PR label. Apply one of:
 | `chore`, `refactor`, `internal` | 🏗 Internal |
 | `dependencies`, `deps` | 📦 Dependencies |
 | (none of the above) | Other changes |
+
+In practice, match the label to the commit type — a `feat: …` PR gets a
+`feature` label, a `fix: …` PR gets a `fix` label, and so on.
 
 PRs authored by `dependabot` or `github-actions` are excluded, as are any
 PRs tagged `skip-changelog` or `ignore-for-release`.
