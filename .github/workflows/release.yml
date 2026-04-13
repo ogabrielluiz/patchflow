@@ -1,0 +1,91 @@
+name: Release
+
+# Tag-driven release. Bump the version in package.json on main, tag it as
+# v<version>, push the tag. This workflow builds, tests, publishes to npm
+# (via the repo's npm Trusted Publisher / OIDC integration), and creates a
+# GitHub Release with notes auto-generated from the merged PRs since the
+# previous tag (grouped per .github/release.yml).
+#
+# If you ever switch away from Trusted Publishing to a classic NPM_TOKEN,
+# swap the publish step to use `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+# and drop the `id-token: write` permission + `--provenance` flag.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to release (e.g. v0.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write   # for creating the GitHub Release
+  id-token: write   # for npm Trusted Publisher OIDC
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION="$(node -p 'require("./package.json").version')"
+          if [ "$PKG_VERSION" != "${{ steps.tag.outputs.version }}" ]; then
+            echo "::error ::Tag ${{ steps.tag.outputs.tag }} does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test
+
+      - name: Build
+        run: bun run build
+
+      - name: Setup Node (for npm publish)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --generate-notes \
+            --verify-tag
